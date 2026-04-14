@@ -1,0 +1,39 @@
+{
+  "name": "mobile",
+  "private": true,
+  "version": "0.0.1",
+  "main": "expo/AppEntry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "3.10.0",
+    "@household/supabase": "workspace:*",
+    "@react-native-async-storage/async-storage": "2.1.2",
+    "@household/config": "workspace:*",
+    "@household/types": "workspace:*",
+    "@household/ui": "workspace:*",
+    "@tanstack/react-query": "5.66.8",
+    "@supabase/supabase-js": "2.49.4",
+    "expo": "~52.0.28",
+    "expo-status-bar": "~2.0.1",
+    "react": "18.3.1",
+    "react-hook-form": "7.55.0",
+    "react-native": "0.76.6",
+    "react-native-url-polyfill": "^2.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.10",
+    "@typescript-eslint/eslint-plugin": "8.28.0",
+    "@typescript-eslint/parser": "8.28.0",
+    "@types/react": "18.3.12",
+    "eslint": "9.22.0",
+    "eslint-plugin-react-hooks": "5.2.0",
+    "typescript": "5.8.2"
+  }
+}

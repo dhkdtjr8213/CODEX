@@ -1,0 +1,24 @@
+{
+  "name": "household-ledger-monorepo",
+  "private": true,
+  "packageManager": "pnpm@10.0.0",
+  "devDependencies": {
+    "typescript": "5.8.2"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "dev:mobile": "pnpm --filter mobile start",
+    "ops:harness:web": "node scripts/ops/web-recurring-harness.mjs",
+    "ops:check-env": "node scripts/ops/validate-runtime-env.mjs",
+    "ops:check-recurring-batch": "node scripts/ops/check-recurring-batch.mjs",
+    "ops:preflight": "node scripts/ops/preflight.mjs",
+    "ops:preflight:local": "node scripts/ops/preflight.mjs --skip-batch --allow-missing",
+    "ops:progress": "node scripts/ops/progress-report.mjs",
+    "ops:ready": "node scripts/ops/ready-check.mjs",
+    "ops:ready:full": "node scripts/ops/ready-check.mjs --with-env --with-batch",
+    "smoke": "powershell -ExecutionPolicy Bypass -File scripts/ops/smoke.ps1",
+    "smoke:with-env": "powershell -ExecutionPolicy Bypass -File scripts/ops/smoke.ps1 -WithEnv",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint"
+  }
+}

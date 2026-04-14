@@ -1,0 +1,19 @@
+{
+  "name": "@household/supabase",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "echo noop"
+  },
+  "dependencies": {
+    "@household/config": "workspace:*",
+    "@household/types": "workspace:*",
+    "@household/ui": "workspace:*",
+    "@supabase/supabase-js": "2.49.4",
+    "dayjs": "1.11.13"
+  }
+}
