@@ -1,34 +1,34 @@
-# \uC608\uC0B0, \uBC18\uBCF5\uC9C0\uCD9C, \uC6D4\uBCC4 \uD1B5\uACC4 \uC124\uACC4 \uBA54\uBAA8
+# 예산, 반복지출, 월별 통계 설계 메모
 
-## \uBC94\uC704
+## 범위
 
-- `budget`: \uC6D4\uBCC4 \uCE74\uD14C\uACE0\uB9AC \uC608\uC0B0
-- `recurring_transaction`: \uB9E4\uC6D4 \uBC18\uBCF5\uB418\uB294 \uACE0\uC815 \uC9C0\uCD9C/\uC218\uC785/\uC774\uCCB4 \uC815\uC758
-- `monthly stats`: \uC6D4 \uC694\uC57D, \uCE74\uD14C\uACE0\uB9AC\uBCC4 \uC9C0\uCD9C \uBE44\uC911, \uC608\uC0B0 \uC9C4\uD589\uB960
+- `budget`: 월별 카테고리 예산
+- `recurring_transaction`: 매월 반복되는 고정 지출/수입/이체 정의
+- `monthly stats`: 월 요약, 카테고리별 지출 비중, 예산 진행률
 
-## \uC571\uACFC \uC6F9 \uC5ED\uD560
+## 앱과 웹 역할
 
-- \uBAA8\uBC14\uC77C: \uC608\uC0B0 \uC9C4\uD589\uB960 \uC694\uC57D, \uBC18\uBCF5\uC9C0\uCD9C \uC694\uC57D, \uAC04\uB2E8 \uB4F1\uB85D/\uC218\uC815
-- \uC6F9: \uCE74\uD14C\uACE0\uB9AC\uBCC4 \uC18C\uBE44 \uBE44\uC911, \uC608\uC0B0 \uC9C4\uD589\uB960, \uBC18\uBCF5\uC9C0\uCD9C \uAD00\uB9AC
+- 모바일: 예산 진행률 요약, 반복지출 요약, 간단 등록/수정
+- 웹: 카테고리별 소비 비중, 예산 진행률, 반복지출 관리
 
-## \uC790\uB3D9 \uBC18\uBCF5 \uC0DD\uC131 \uCC98\uB9AC
+## 자동 반복 생성 처리
 
-\uC774\uBC88 MVP\uC5D0\uC11C\uB294 `recurring_transactions`\uB97C \uB4F1\uB85D\uD558\uACE0 \uAD00\uB9AC\uD558\uB294 \uAE30\uBCF8 \uD750\uB984\uAE4C\uC9C0\uB9CC \uAD6C\uD604\uD569\uB2C8\uB2E4.
+이번 MVP에서는 `recurring_transactions`를 등록하고 관리하는 기본 흐름까지만 구현합니다.
 
-### \uD604\uC7AC \uAD6C\uD604
+### 현재 구현
 
-- \uBC18\uBCF5 \uC9C0\uCD9C \uB4F1\uB85D/\uC218\uC815
-- \uB2E4\uC74C \uC2E4\uD589\uC77C \uBCF4\uAD00
-- \uC6F9/\uBAA8\uBC14\uC77C \uD654\uBA74\uC5D0\uC11C \uBAA9\uB85D \uD655\uC778
+- 반복 지출 등록/수정
+- 다음 실행일 보관
+- 웹/모바일 화면에서 목록 확인
 
 ### TODO
 
-- Supabase Edge Function \uB610\uB294 cron \uAE30\uBC18 \uBC30\uCE58\uC5D0\uC11C `next_run_at <= now()` \uC870\uAC74\uC758 \uD56D\uBAA9\uC744 \uC2E4\uD589
-- \uC2E4\uD589 \uC2DC `transactions` \uB808\uCF54\uB4DC \uC0DD\uC131
-- \uC131\uACF5 \uD6C4 `next_run_at` \uC744 \uB2E4\uC74C \uC6D4\uB85C \uC774\uB3D9
-- \uC911\uBCF5 \uC0DD\uC131 \uBC29\uC9C0\uB97C \uC704\uD574 execution log \uD14C\uC774\uBE14 \uCD94\uAC00 \uAC80\uD1A0
+- Supabase Edge Function 또는 cron 기반 배치에서 `next_run_at <= now()` 조건의 항목을 실행
+- 실행 시 `transactions` 레코드 생성
+- 성공 후 `next_run_at` 을 다음 월로 이동
+- 중복 생성 방지를 위해 execution log 테이블 추가 검토
 
-## \uCC28\uD2B8 \uAD50\uCCB4 \uC804\uB7B5
+## 차트 교체 전략
 
-\uD1B5\uACC4 \uB370\uC774\uD130\uB294 \uD604\uC7AC `packages/supabase/src/ledger.ts`\uC758 `fetchMonthlyStats()`\uC5D0\uC11C \uB3C4\uBA54\uC778 \uB370\uC774\uD130 \uD615\uD0DC\uB85C \uB9CC\uB4ED\uB2C8\uB2E4.
-\uB530\uB77C\uC11C \uCC28\uD2B8 \uB77C\uC774\uBE0C\uB7EC\uB9AC\uB97C \uBC14\uAFB8\uB354\uB77C\uB3C4 UI \uB808\uC774\uC5B4\uC5D0\uC11C\uB9CC \uAD50\uCCB4\uD558\uBA74 \uB429\uB2C8\uB2E4.
+통계 데이터는 현재 `packages/supabase/src/ledger.ts`의 `fetchMonthlyStats()`에서 도메인 데이터 형태로 만듭니다.
+따라서 차트 라이브러리를 바꾸더라도 UI 레이어에서만 교체하면 됩니다.
