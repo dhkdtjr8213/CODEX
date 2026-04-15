@@ -106,6 +106,9 @@
     - 파일: `apps/web/components/ledger-workspace.tsx`
     - 반영: workspace 네비, quick action, 거래 필터 바, 카드/테이블 표면, 관리 사이드 패널 스타일 통일
     - 검증: `pnpm typecheck`, `pnpm lint`, `npm run smoke` 통과
+  - 최종 PR 리허설 재실행 통과
+    - 명령: `pnpm ops:pr-rehearsal`
+    - 리포트: `docs/manual-kit/pr-rehearsal-last-report.md` 갱신
   - feature branch push 완료: `feat/multi-agent-gemma4-orchestration`
   - Draft PR 생성: `https://github.com/dhkdtjr8213/CODEX/pull/1`
 
