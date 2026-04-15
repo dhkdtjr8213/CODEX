@@ -59,6 +59,7 @@
 - [x] `codex_runner.py` provider 스위치 추가(OpenAI/OpenAI-compatible/Gemini)
 - [x] Gemma4 E4B 로컬 모델 pull 및 실연결 점검 통과
 - [x] PR 워크플로 리허설 스크립트 추가 및 PASS
+- [x] `ops:check-harness-runner` Python 경로 하드코딩 이슈 수정(자동 탐색) 및 quick-check PASS 재검증
 
 #### 6) 추가 작업 메모 (2026-04-15)
 - 반영 완료:
@@ -81,12 +82,16 @@
   - `main` 브랜치 상태 확인: `protected=true`
   - `codex_runner` 업그레이드 후 하네스 fallback 검증 통과: `LEDGER-20260415-112241`
   - `ops:check-harness-runner` fallback 모드 검증 통과: `LEDGER-20260415-124555`
+  - `scripts/ops/check-harness-runner.mjs` Python 런타임 탐색 로직 개선
+    - 우선순위: `PYTHON_BIN` -> `C:\\Python314\\python.exe` -> `C:\\WINDOWS\\py.exe` -> `python` -> `py`
+    - 특정 경로 하드코딩으로 인한 `spawnSync ... EPERM`/미탐지 상황 완화
   - `OPENAI_API_KEY` 반영 확인: `present`
   - 실호출 점검(`LEDGER-20260415-125347`) 실패 원인: OpenAI API `429 insufficient_quota`
   - `HARNESS_ALLOW_FALLBACK=1` 점검 통과: `LEDGER-20260415-125744`
   - Ollama 설치 및 `gemma4:e4b` pull 완료
   - `pnpm ops:check-harness-runner` quick mode 통과 (`fallback_output: no`)
   - `pnpm ops:pr-rehearsal` 통과 (typecheck/lint/smoke)
+  - Python 탐색 로직 반영 후 `pnpm ops:pr-rehearsal` 재실행 통과
   - feature branch push 완료: `feat/multi-agent-gemma4-orchestration`
   - Draft PR 생성: `https://github.com/dhkdtjr8213/CODEX/pull/1`
 

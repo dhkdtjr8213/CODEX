@@ -3,7 +3,33 @@ import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 
-const pythonBin = process.env.PYTHON_BIN?.trim() || "C:\\Python314\\python.exe";
+function canRunPython(bin) {
+  const probe = spawnSync(bin, ["-V"], {
+    shell: false,
+    encoding: "utf8",
+  });
+  return !probe.error && probe.status === 0;
+}
+
+function resolvePythonBin() {
+  const explicit = process.env.PYTHON_BIN?.trim();
+  const candidates = [];
+  if (explicit) candidates.push(explicit);
+  candidates.push("C:\\Python314\\python.exe", "C:\\WINDOWS\\py.exe", "python", "py");
+
+  for (const candidate of candidates) {
+    const isPathCandidate = candidate.includes("\\") || candidate.includes("/");
+    if (isPathCandidate && !existsSync(candidate)) {
+      continue;
+    }
+    if (canRunPython(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+const pythonBin = resolvePythonBin();
 const provider = (process.env.AGENT_PROVIDER || "openai_responses").trim();
 const hasOpenAiKey = Boolean(process.env.OPENAI_API_KEY?.trim());
 const hasAgentApiKey = Boolean(process.env.AGENT_API_KEY?.trim());
@@ -25,8 +51,8 @@ const providerHasCredential = (() => {
   return hasAgentApiKey || hasOpenAiKey;
 })();
 
-if (!existsSync(pythonBin)) {
-  console.error(`[fail] Python binary not found: ${pythonBin}`);
+if (!pythonBin) {
+  console.error("[fail] Python runtime not found. Set PYTHON_BIN or install python/py launcher.");
   process.exit(1);
 }
 
