@@ -1315,7 +1315,7 @@ export function LedgerWorkspace({
 
   if (!authSnapshot.isAuthenticated) {
     return (
-      <section className="rounded-[24px] bg-card p-6 shadow-sm">
+      <section className="rounded-[24px] border border-[var(--border)] bg-[var(--card-strong)] p-6 shadow-[var(--shadow-soft)]">
         <h2 className="text-xl font-semibold">
           {"거래 관리"}
         </h2>
@@ -1341,7 +1341,7 @@ export function LedgerWorkspace({
               className={`rounded-2xl px-4 py-3 text-left transition ${
                 activeView === view.value
                   ? "bg-[color:var(--point)] text-white shadow-[0_10px_24px_rgba(21,93,73,0.26)]"
-                  : "bg-white text-[color:var(--foreground)] hover:bg-[color:var(--surface-soft)]"
+                  : "bg-[var(--card-strong)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-soft)]"
               }`}
               onClick={() => setActiveView(view.value)}
               type="button"
@@ -1363,7 +1363,7 @@ export function LedgerWorkspace({
           </p>
           <div className="mt-2 grid gap-2">
             <button
-              className="rounded-xl border border-stone-300 px-3 py-2 text-left text-sm"
+              className="rounded-xl border border-[var(--border)] px-3 py-2 text-left text-sm"
               onClick={() => {
                 setActiveView("manage");
                 setManageSection("transaction");
@@ -1373,7 +1373,7 @@ export function LedgerWorkspace({
               {"빠른 입력 열기"}
             </button>
             <button
-              className="rounded-xl border border-stone-300 px-3 py-2 text-left text-sm"
+              className="rounded-xl border border-[var(--border)] px-3 py-2 text-left text-sm"
               onClick={() => setActiveView("transactions")}
               type="button"
             >
@@ -1412,7 +1412,7 @@ export function LedgerWorkspace({
         <div className={activeView === "dashboard" ? "" : "hidden"}>
           <SummaryCards summary={ledger?.summary ?? emptySummary} loading={loading} />
 
-          <div className="mt-4 rounded-2xl border border-stone-200 bg-white p-3">
+          <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] p-3">
             <p className="text-sm font-medium text-stone-700">{"위젯 순서"}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {dashboardOrder.map((widget, index) => {
@@ -1426,11 +1426,11 @@ export function LedgerWorkspace({
                 return (
                   <div
                     key={`order-${widget}`}
-                    className="flex items-center gap-2 rounded-full border border-stone-300 px-3 py-1.5 text-xs"
+                    className="flex items-center gap-2 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs"
                   >
                     <span>{label}</span>
                     <button
-                      className="rounded-full border border-stone-300 px-2 py-0.5 disabled:opacity-40"
+                      className="rounded-full border border-[var(--border)] px-2 py-0.5 disabled:opacity-40"
                       disabled={index === 0}
                       onClick={() => moveDashboardWidget(widget, -1)}
                       type="button"
@@ -1438,7 +1438,7 @@ export function LedgerWorkspace({
                       {"↑"}
                     </button>
                     <button
-                      className="rounded-full border border-stone-300 px-2 py-0.5 disabled:opacity-40"
+                      className="rounded-full border border-[var(--border)] px-2 py-0.5 disabled:opacity-40"
                       disabled={index === dashboardOrder.length - 1}
                       onClick={() => moveDashboardWidget(widget, 1)}
                       type="button"
@@ -1446,14 +1446,14 @@ export function LedgerWorkspace({
                       {"↓"}
                     </button>
                     <button
-                      className="rounded-full border border-stone-300 px-2 py-0.5"
+                      className="rounded-full border border-[var(--border)] px-2 py-0.5"
                       onClick={() => toggleWidgetCollapsed(widget)}
                       type="button"
                     >
                       {collapsedWidgets.includes(widget) ? "열기" : "접기"}
                     </button>
                     <button
-                      className="rounded-full border border-stone-300 px-2 py-0.5"
+                      className="rounded-full border border-[var(--border)] px-2 py-0.5"
                       onClick={() => void handleManualRefresh()}
                       type="button"
                     >
@@ -1478,7 +1478,7 @@ export function LedgerWorkspace({
                 return (
                   <article
                     key={`widget-collapsed-${widget}`}
-                    className="rounded-[24px] border border-stone-200 bg-white px-5 py-4 text-sm text-stone-600"
+                    className="rounded-[24px] border border-[var(--border)] bg-[var(--card-strong)] shadow-[var(--shadow-soft)] px-5 py-4 text-sm text-stone-600"
                   >
                     {`${compactLabel} 위젯이 접혀 있습니다.`}
                   </article>
@@ -1504,7 +1504,7 @@ export function LedgerWorkspace({
           </section>
         </div>
 
-        <section className={`rounded-[24px] bg-card p-6 shadow-sm ${activeView === "transactions" || activeView === "calendar" ? "" : "hidden"}`} id="web-transactions">
+        <section className={`rounded-[24px] border border-[var(--border)] bg-[var(--card-strong)] p-6 shadow-[var(--shadow-soft)] ${activeView === "transactions" || activeView === "calendar" ? "" : "hidden"}`} id="web-transactions">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl font-semibold">
               {activeView === "calendar" ? "월별 달력 입출금" : "거래 검토 및 필터"}
@@ -1512,7 +1512,7 @@ export function LedgerWorkspace({
             {activeView === "transactions" ? (
               <div className="flex flex-wrap gap-2">
                 <button
-                  className="rounded-full border border-stone-300 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-full border border-[var(--border)] px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={isCopyingFilterLink}
                   onClick={() => void copyCurrentFilterUrl()}
                   type="button"
@@ -1520,7 +1520,7 @@ export function LedgerWorkspace({
                   {isCopyingFilterLink ? "복사 중..." : "링크 복사"}
                 </button>
                 <button
-                  className="rounded-full border border-stone-300 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-full border border-[var(--border)] px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={!hasResettableFilters}
                   onClick={resetFilters}
                   type="button"
@@ -1528,21 +1528,21 @@ export function LedgerWorkspace({
                   {"필터 초기화"}
                 </button>
                 <button
-                  className="rounded-full border border-stone-300 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-full border border-[var(--border)] px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => exportTransactionsAsCsv(filteredTransactions)}
                   type="button"
                 >
                   {"CSV Export"}
                 </button>
                 <button
-                  className="rounded-full border border-stone-300 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-full border border-[var(--border)] px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => exportTransactionsAsXlsx(filteredTransactions)}
                   type="button"
                 >
                   {"XLSX Export"}
                 </button>
                 <button
-                  className="rounded-full border border-stone-300 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-full border border-[var(--border)] px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={loading || isRefreshingLedger}
                   onClick={() => void handleManualRefresh()}
                   type="button"
@@ -1553,7 +1553,7 @@ export function LedgerWorkspace({
             ) : (
               <div className="flex flex-wrap gap-2">
                 <button
-                  className="rounded-full border border-stone-300 px-4 py-2 text-sm"
+                  className="rounded-full border border-[var(--border)] px-4 py-2 text-sm"
                   onClick={() => {
                     setPeriodPreset("this_month");
                     const range = getPresetRange("this_month");
@@ -1567,7 +1567,7 @@ export function LedgerWorkspace({
                   {"이번 달 기준"}
                 </button>
                 <button
-                  className="rounded-full border border-stone-300 px-4 py-2 text-sm"
+                  className="rounded-full border border-[var(--border)] px-4 py-2 text-sm"
                   onClick={() => {
                     setActiveView("manage");
                     setManageSection("transaction");
@@ -1592,25 +1592,25 @@ export function LedgerWorkspace({
             </p>
           ) : null}
 
-          <div className={`mt-4 rounded-2xl border border-stone-200 bg-white px-3 py-3 ${activeView === "transactions" ? "" : "hidden"}`}>
+          <div className={`mt-4 rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] shadow-[var(--shadow-soft)] px-3 py-3 ${activeView === "transactions" ? "" : "hidden"}`}>
             <p className="text-xs font-medium text-stone-600">{"저장 필터 프리셋"}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               <button
-                className="rounded-full border border-stone-300 px-3 py-1.5 text-xs"
+                className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs"
                 onClick={() => applySavedFilterPreset("salary_day")}
                 type="button"
               >
                 {"월급일"}
               </button>
               <button
-                className="rounded-full border border-stone-300 px-3 py-1.5 text-xs"
+                className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs"
                 onClick={() => applySavedFilterPreset("fixed_cost")}
                 type="button"
               >
                 {"고정비"}
               </button>
               <button
-                className="rounded-full border border-stone-300 px-3 py-1.5 text-xs"
+                className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs"
                 onClick={() => applySavedFilterPreset("meal_expense")}
                 type="button"
               >
@@ -1621,13 +1621,13 @@ export function LedgerWorkspace({
 
           <div className={`mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3 ${activeView === "transactions" ? "" : "hidden"}`}>
             <input
-              className="rounded-2xl border border-stone-200 px-4 py-3 text-sm"
+              className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]"
               onChange={(event) => setSearchInput(event.target.value)}
               placeholder="메모, 계정, 카테고리 검색"
               value={searchInput}
             />
             <select
-              className="rounded-2xl border border-stone-200 px-4 py-3 text-sm"
+              className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]"
               onChange={(event) => setPeriodPreset(event.target.value as PeriodPreset)}
               value={periodPreset}
             >
@@ -1638,7 +1638,7 @@ export function LedgerWorkspace({
               ))}
             </select>
             <select
-              className="rounded-2xl border border-stone-200 px-4 py-3 text-sm"
+              className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]"
               onChange={(event) =>
                 setTypeFilter(event.target.value as "all" | TransactionType)
               }
@@ -1652,7 +1652,7 @@ export function LedgerWorkspace({
               ))}
             </select>
             <select
-              className="rounded-2xl border border-stone-200 px-4 py-3 text-sm"
+              className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]"
               onChange={(event) => setAccountFilter(event.target.value)}
               value={accountFilter}
             >
@@ -1664,7 +1664,7 @@ export function LedgerWorkspace({
               ))}
             </select>
             <select
-              className="rounded-2xl border border-stone-200 px-4 py-3 text-sm"
+              className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]"
               onChange={(event) => setCategoryFilter(event.target.value)}
               value={categoryFilter}
             >
@@ -1677,7 +1677,7 @@ export function LedgerWorkspace({
             </select>
             <div className="grid grid-cols-2 gap-3 xl:col-span-3">
               <input
-                className="rounded-2xl border border-stone-200 px-4 py-3 text-sm"
+                className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]"
                 onChange={(event) => {
                   setPeriodPreset("custom");
                   setStartDate(event.target.value);
@@ -1686,7 +1686,7 @@ export function LedgerWorkspace({
                 value={startDate}
               />
               <input
-                className="rounded-2xl border border-stone-200 px-4 py-3 text-sm"
+                className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]"
                 onChange={(event) => {
                   setPeriodPreset("custom");
                   setEndDate(event.target.value);
@@ -1696,7 +1696,7 @@ export function LedgerWorkspace({
               />
             </div>
             <select
-              className="rounded-2xl border border-stone-200 px-4 py-3 text-sm"
+              className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]"
               onChange={(event) => setTransactionSort(event.target.value as TransactionSort)}
               value={transactionSort}
             >
@@ -1705,7 +1705,7 @@ export function LedgerWorkspace({
               <option value="type">{"정렬: 유형"}</option>
             </select>
             <select
-              className="rounded-2xl border border-stone-200 px-4 py-3 text-sm"
+              className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]"
               onChange={(event) => setSortDirection(event.target.value as SortDirection)}
               value={sortDirection}
             >
@@ -1713,7 +1713,7 @@ export function LedgerWorkspace({
               <option value="asc">{"오름차순"}</option>
             </select>
             <select
-              className="rounded-2xl border border-stone-200 px-4 py-3 text-sm"
+              className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]"
               onChange={(event) =>
                 setTransactionDisplayMode(event.target.value as TransactionDisplayMode)
               }
@@ -1723,7 +1723,7 @@ export function LedgerWorkspace({
               <option value="table">{"표시: 테이블"}</option>
             </select>
             <select
-              className="rounded-2xl border border-stone-200 px-4 py-3 text-sm"
+              className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]"
               onChange={(event) => {
                 setTransactionPageSize(Number(event.target.value));
                 setTransactionPage(1);
@@ -1772,7 +1772,7 @@ export function LedgerWorkspace({
           ) : null}
 
           {activeView === "transactions" && !loading && !sortedTransactions.length ? (
-            <p className="mt-4 rounded-2xl bg-stone-100 px-4 py-5 text-sm text-stone-600">
+            <p className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-5 text-sm text-[var(--muted-foreground)]">
               {
                 "조건에 맞는 거래가 없습니다. 필터 조건을 조정하거나 오른쪽 폼에서 거래를 입력해보세요."
               }
@@ -1785,7 +1785,7 @@ export function LedgerWorkspace({
                 {pagedTransactions.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-2xl border border-stone-200 bg-white p-4"
+                    className="rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] shadow-[var(--shadow-soft)] p-4"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -1820,7 +1820,7 @@ export function LedgerWorkspace({
                         </p>
                         <div className="mt-3 flex gap-2">
                           <button
-                            className="rounded-full border border-stone-300 px-3 py-1 text-xs"
+                            className="rounded-full border border-[var(--border)] px-3 py-1 text-xs"
                             onClick={() => prefillTransactionForm(item.id)}
                             type="button"
                           >
@@ -1842,13 +1842,13 @@ export function LedgerWorkspace({
               </div>
             ) : (
               <div className="mt-4">
-                <div className="mb-2 flex flex-wrap items-center gap-2 rounded-2xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-600">
+                <div className="mb-2 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] shadow-[var(--shadow-soft)] px-3 py-2 text-xs text-stone-600">
                   <span className="font-medium">{"컬럼 표시"}</span>
                   <button
                     className={`rounded-full px-3 py-1 ${
                       hasAccountCategoryColumn
                         ? "bg-[color:var(--point-soft)] text-[color:var(--point-strong)]"
-                        : "border border-stone-300 bg-white"
+                        : "border border-[var(--border)] bg-white"
                     }`}
                     onClick={() => toggleTableColumn("account_category")}
                     type="button"
@@ -1859,7 +1859,7 @@ export function LedgerWorkspace({
                     className={`rounded-full px-3 py-1 ${
                       hasMemoColumn
                         ? "bg-[color:var(--point-soft)] text-[color:var(--point-strong)]"
-                        : "border border-stone-300 bg-white"
+                        : "border border-[var(--border)] bg-white"
                     }`}
                     onClick={() => toggleTableColumn("memo")}
                     type="button"
@@ -1868,7 +1868,7 @@ export function LedgerWorkspace({
                   </button>
                   <span className="ml-auto text-stone-500">{`선택 ${selectedTransactionIds.length}건`}</span>
                   <select
-                    className="rounded-full border border-stone-300 px-3 py-1"
+                    className="rounded-full border border-[var(--border)] px-3 py-1"
                     onChange={(event) => setSelectedBulkCategoryId(event.target.value)}
                     value={selectedBulkCategoryId}
                   >
@@ -1880,7 +1880,7 @@ export function LedgerWorkspace({
                     ))}
                   </select>
                   <button
-                    className="rounded-full border border-stone-300 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-full border border-[var(--border)] px-3 py-1 disabled:cursor-not-allowed disabled:opacity-40"
                     disabled={!selectedTransactions.length || !selectedBulkCategoryId}
                     onClick={() => void bulkUpdateSelectedTransactionCategory()}
                     type="button"
@@ -1888,7 +1888,7 @@ export function LedgerWorkspace({
                     {"일괄 카테고리 변경"}
                   </button>
                   <button
-                    className="rounded-full border border-stone-300 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-full border border-[var(--border)] px-3 py-1 disabled:cursor-not-allowed disabled:opacity-40"
                     disabled={!selectedTransactions.length}
                     onClick={() => exportTransactionsAsCsv(selectedTransactions)}
                     type="button"
@@ -1896,7 +1896,7 @@ export function LedgerWorkspace({
                     {"선택 CSV"}
                   </button>
                   <button
-                    className="rounded-full border border-stone-300 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-full border border-[var(--border)] px-3 py-1 disabled:cursor-not-allowed disabled:opacity-40"
                     disabled={!selectedTransactions.length}
                     onClick={() => exportTransactionsAsXlsx(selectedTransactions)}
                     type="button"
@@ -1912,7 +1912,7 @@ export function LedgerWorkspace({
                     {"선택 삭제"}
                   </button>
                 </div>
-              <div className="max-h-[560px] overflow-auto rounded-2xl border border-stone-200 bg-white">
+              <div className="max-h-[560px] overflow-auto rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] shadow-[var(--shadow-soft)]">
                 <table className="min-w-[860px] w-full text-left text-sm">
                   <thead className="sticky top-0 z-10 bg-stone-50 text-stone-600">
                     <tr>
@@ -2010,7 +2010,7 @@ export function LedgerWorkspace({
                         <td className="px-4 py-3">
                           <div className="flex justify-end gap-2">
                             <button
-                              className="rounded-full border border-stone-300 px-3 py-1 text-xs"
+                              className="rounded-full border border-[var(--border)] px-3 py-1 text-xs"
                               onClick={() => prefillTransactionForm(item.id)}
                               type="button"
                             >
@@ -2035,7 +2035,7 @@ export function LedgerWorkspace({
             )}
           </div>
           {activeView === "transactions" && sortedTransactions.length > 0 ? (
-            <div className="mt-3 flex items-center justify-between rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm">
+            <div className="mt-3 flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] shadow-[var(--shadow-soft)] px-4 py-3 text-sm">
               <p className="text-stone-600">
                 {`${(transactionPage - 1) * transactionPageSize + 1}-${Math.min(
                   transactionPage * transactionPageSize,
@@ -2044,7 +2044,7 @@ export function LedgerWorkspace({
               </p>
               <div className="flex gap-2">
                 <button
-                  className="rounded-full border border-stone-300 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-full border border-[var(--border)] px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={transactionPage <= 1}
                   onClick={() => setTransactionPage((prev) => Math.max(prev - 1, 1))}
                   type="button"
@@ -2052,7 +2052,7 @@ export function LedgerWorkspace({
                   {"이전"}
                 </button>
                 <button
-                  className="rounded-full border border-stone-300 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-full border border-[var(--border)] px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={transactionPage >= totalTransactionPages}
                   onClick={() =>
                     setTransactionPage((prev) => Math.min(prev + 1, totalTransactionPages))
@@ -2069,7 +2069,7 @@ export function LedgerWorkspace({
 
       <div className={`flex flex-col gap-6 ${activeView === "manage" ? "" : "hidden"}`} id="web-manage">
         {loading ? (
-          <p className="rounded-2xl bg-stone-100 px-4 py-3 text-sm text-stone-600">
+          <p className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 text-sm text-[var(--muted-foreground)]">
             {"관리 데이터를 불러오는 중입니다."}
           </p>
         ) : null}
@@ -2081,7 +2081,7 @@ export function LedgerWorkspace({
         ) : null}
 
         <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <aside className="h-fit rounded-2xl border border-stone-200 bg-white p-3 lg:sticky lg:top-6">
+          <aside className="h-fit rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] p-3 lg:sticky lg:top-6">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">
               {"관리 메뉴"}
             </p>
@@ -2092,7 +2092,7 @@ export function LedgerWorkspace({
                   className={`rounded-xl px-3 py-2 text-left text-sm transition ${
                     manageSection === item.key
                       ? "bg-[color:var(--point)] text-white shadow-[0_8px_18px_rgba(21,93,73,0.2)]"
-                      : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                      : "border border-[var(--border)] bg-white text-stone-700 hover:bg-stone-50"
                   }`}
                   onClick={() => setManageSection(item.key)}
                   type="button"
@@ -2107,7 +2107,7 @@ export function LedgerWorkspace({
           </aside>
 
           <div className="flex flex-col gap-6">
-            <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700">
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] px-4 py-3 text-sm text-stone-700">
               <span className="font-semibold">{manageSectionMeta.label}</span>
               {` · ${manageSectionMeta.description}`}
             </div>
@@ -2495,7 +2495,7 @@ export function LedgerWorkspace({
               value={profile?.defaultCurrency ?? "KRW"}
             />
           </div>
-          <div className="mt-4 rounded-2xl bg-stone-100 p-4 text-sm text-stone-700">
+          <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4 text-sm text-stone-700">
             {
               "현재 필터 결과를 CSV와 XLSX 형식으로 바로 내보낼 수 있으며, 향후 보고서 형식으로도 확장 가능한 구조입니다."
             }
@@ -2520,6 +2520,7 @@ export function LedgerWorkspace({
     </div>
   );
 }
+
 
 
 

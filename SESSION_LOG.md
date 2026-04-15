@@ -102,6 +102,10 @@
     - 파일: `apps/web/components/ledger-sections.tsx`
     - 반영: 대시보드/거래/예산/반복로그/설정 패널의 상용화 스타일 통일
     - 검증: `pnpm typecheck`, `pnpm lint`, `npm run smoke` 통과
+  - 웹 워크스페이스 상단/필터/거래테이블/관리패널 2차 상용화 스타일 적용
+    - 파일: `apps/web/components/ledger-workspace.tsx`
+    - 반영: workspace 네비, quick action, 거래 필터 바, 카드/테이블 표면, 관리 사이드 패널 스타일 통일
+    - 검증: `pnpm typecheck`, `pnpm lint`, `npm run smoke` 통과
   - feature branch push 완료: `feat/multi-agent-gemma4-orchestration`
   - Draft PR 생성: `https://github.com/dhkdtjr8213/CODEX/pull/1`
 
