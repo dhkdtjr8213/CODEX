@@ -98,6 +98,10 @@
     - 파일: `apps/web/app/page.tsx`, `apps/web/app/globals.css`
     - 기준 문서: `docs/design-benchmark-playstore.md`
     - 검증: `pnpm typecheck`, `pnpm lint`, `npm run smoke` 통과
+  - 웹 워크스페이스 내부 UI 톤 상향 적용(카드/폼/버튼 공통 스타일)
+    - 파일: `apps/web/components/ledger-sections.tsx`
+    - 반영: 대시보드/거래/예산/반복로그/설정 패널의 상용화 스타일 통일
+    - 검증: `pnpm typecheck`, `pnpm lint`, `npm run smoke` 통과
   - feature branch push 완료: `feat/multi-agent-gemma4-orchestration`
   - Draft PR 생성: `https://github.com/dhkdtjr8213/CODEX/pull/1`
 
