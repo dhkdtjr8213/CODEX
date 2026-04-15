@@ -254,6 +254,19 @@ const WORKSPACE_VIEW_VALUES: WorkspaceView[] = [
   "settings"
 ];
 type SavedFilterPreset = "salary_day" | "fixed_cost" | "meal_expense";
+type QuickTransactionTemplate = {
+  key: string;
+  type: TransactionType;
+  amount: number;
+  accountId: string;
+  accountName: string;
+  categoryId: string | null;
+  categoryName: string;
+  description: string;
+  transferAccountId: string | null;
+  transferAccountName: string;
+  usedCount: number;
+};
 
 export function LedgerWorkspace({
   initialSnapshot
@@ -1344,6 +1357,69 @@ export function LedgerWorkspace({
       return point;
     });
   }, [ledger?.transactions]);
+  const budgetInsightItems = useMemo(() => {
+    const budgetRows = ledger?.monthlyStats.budgetProgress ?? [];
+    return budgetRows
+      .filter((item) => item.percentUsed > 100)
+      .sort((left, right) => right.percentUsed - left.percentUsed)
+      .slice(0, 3)
+      .map((item) => ({
+        categoryName: item.categoryName ?? "카테고리",
+        percentUsed: item.percentUsed,
+        overAmount: Math.max(0, item.spentAmount - item.budgetAmount)
+      }));
+  }, [ledger?.monthlyStats.budgetProgress]);
+  const topExpenseCategoryItems = useMemo(() => {
+    return (ledger?.monthlyStats.categoryBreakdown ?? []).slice(0, 3);
+  }, [ledger?.monthlyStats.categoryBreakdown]);
+  const quickTransactionTemplates = useMemo<QuickTransactionTemplate[]>(() => {
+    const source = ledger?.transactions ?? [];
+    const map = new Map<string, QuickTransactionTemplate>();
+
+    for (const item of source) {
+      const normalizedDescription = (item.description ?? "").trim();
+      const signature = [
+        item.type,
+        item.accountId,
+        item.categoryId ?? "",
+        item.transferAccountId ?? "",
+        normalizedDescription
+      ].join("|");
+      const current = map.get(signature);
+
+      if (!current) {
+        map.set(signature, {
+          key: signature,
+          type: item.type,
+          amount: item.amount,
+          accountId: item.accountId,
+          accountName: item.accountName ?? "계정",
+          categoryId: item.categoryId ?? null,
+          categoryName: item.categoryName ?? "",
+          description: normalizedDescription,
+          transferAccountId: item.transferAccountId ?? null,
+          transferAccountName: item.transferAccountName ?? "",
+          usedCount: 1
+        });
+        continue;
+      }
+
+      current.usedCount += 1;
+      current.amount = item.amount;
+      current.accountName = item.accountName ?? current.accountName;
+      current.categoryName = item.categoryName ?? current.categoryName;
+      current.transferAccountName = item.transferAccountName ?? current.transferAccountName;
+    }
+
+    return [...map.values()]
+      .sort((left, right) => {
+        if (right.usedCount !== left.usedCount) {
+          return right.usedCount - left.usedCount;
+        }
+        return right.amount - left.amount;
+      })
+      .slice(0, 5);
+  }, [ledger?.transactions]);
 
   const workspaceViews: Array<{
     value: WorkspaceView;
@@ -1517,6 +1593,57 @@ export function LedgerWorkspace({
         <div id="web-dashboard" />
         <div className={activeView === "dashboard" ? "" : "hidden"}>
           <SummaryCards summary={ledger?.summary ?? emptySummary} loading={loading} />
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] p-4 shadow-[var(--shadow-soft)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[var(--muted-foreground)]">
+                {"Monthly Insight"}
+              </p>
+              <h3 className="mt-2 text-base font-semibold text-[var(--foreground)]">
+                {"예산 초과 카테고리 Top 3"}
+              </h3>
+              {!budgetInsightItems.length ? (
+                <p className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-3 text-sm text-[var(--muted-foreground)]">
+                  {"이번 달 예산 초과 카테고리가 없습니다. 좋은 흐름이에요."}
+                </p>
+              ) : (
+                <div className="mt-3 flex flex-col gap-2">
+                  {budgetInsightItems.map((item) => (
+                    <div key={`budget-insight-${item.categoryName}`} className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-3">
+                      <p className="text-sm font-semibold text-rose-700">{item.categoryName}</p>
+                      <p className="mt-1 text-xs text-rose-700">
+                        {`사용률 ${item.percentUsed.toFixed(1)}% · 초과 ${formatCurrency(item.overAmount)}`}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] p-4 shadow-[var(--shadow-soft)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[var(--muted-foreground)]">
+                {"Spending Focus"}
+              </p>
+              <h3 className="mt-2 text-base font-semibold text-[var(--foreground)]">
+                {"지출 비중 상위 카테고리"}
+              </h3>
+              {!topExpenseCategoryItems.length ? (
+                <p className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-3 text-sm text-[var(--muted-foreground)]">
+                  {"지출 데이터가 쌓이면 핵심 카테고리 분석이 표시됩니다."}
+                </p>
+              ) : (
+                <div className="mt-3 flex flex-col gap-2">
+                  {topExpenseCategoryItems.map((item) => (
+                    <div key={`expense-top-${item.categoryId}`} className="rounded-xl border border-[var(--border)] bg-white px-3 py-3">
+                      <p className="text-sm font-semibold text-[var(--foreground)]">{item.categoryName}</p>
+                      <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                        {`${item.percentage.toFixed(1)}% · ${formatCurrency(item.amount)}`}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
 
           <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] p-3">
             <p className="text-sm font-medium text-stone-700">{"위젯 순서"}</p>
@@ -2220,6 +2347,54 @@ export function LedgerWorkspace({
 
         <div className={manageSection === "transaction" ? "" : "hidden"}>
         <FormSection title="빠른 거래 입력">
+          <div className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] px-4 py-4">
+            <p className="text-sm font-semibold text-[var(--foreground)]">
+              {"최근 사용 거래 템플릿"}
+            </p>
+            <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+              {"자주 입력하는 거래를 원탭으로 불러와서 빠르게 등록할 수 있습니다."}
+            </p>
+            {!quickTransactionTemplates.length ? (
+              <p className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-3 text-sm text-[var(--muted-foreground)]">
+                {"아직 템플릿으로 만들 최근 거래가 없습니다. 거래를 2~3건만 입력하면 자동 추천됩니다."}
+              </p>
+            ) : (
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                {quickTransactionTemplates.map((template) => (
+                  <button
+                    key={`quick-template-${template.key}`}
+                    className="rounded-xl border border-[var(--border)] bg-white px-3 py-3 text-left transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-soft)]"
+                    onClick={() => {
+                      transactionForm.reset({
+                        ...transactionDefaults,
+                        type: template.type,
+                        amountInput: String(template.amount),
+                        accountId: template.accountId,
+                        categoryId: template.categoryId ?? "",
+                        transferAccountId: template.transferAccountId ?? "",
+                        description: template.description,
+                        occurredAt: getTodayInputValue()
+                      });
+                      showToast("success", "거래 템플릿을 불러왔습니다.");
+                    }}
+                    type="button"
+                  >
+                    <p className="text-sm font-semibold text-[var(--foreground)]">
+                      {template.description || (template.type === "transfer" ? "이체 템플릿" : "빠른 입력 템플릿")}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                      {`${template.type === "income" ? "수입" : template.type === "expense" ? "지출" : "이체"} · ${template.accountName}${
+                        template.type === "transfer" && template.transferAccountName ? ` → ${template.transferAccountName}` : ""
+                      }${template.categoryName ? ` · ${template.categoryName}` : ""}`}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[var(--point-strong)]">
+                      {formatCurrency(template.amount)}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-4">
             <p className="text-sm font-semibold text-[var(--foreground)]">
               {"추천 스타터 팩 (상위 가계부 앱 공통 구조)"}

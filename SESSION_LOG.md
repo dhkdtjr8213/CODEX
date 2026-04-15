@@ -117,6 +117,11 @@
     - 웹 `스타터 팩` 추가: 기본 계정/카테고리 원클릭 생성 + 최초 빈 데이터 자동 1회 생성
     - 파일: `apps/web/components/ledger-workspace.tsx`
     - 검증: `pnpm typecheck`, `pnpm lint`, `npm run smoke` 통과
+  - 레퍼런스 기반 2차 기능 추가
+    - `최근 사용 거래 템플릿` 원탭 불러오기(빠른 입력 패널)
+    - `월간 인사이트 카드` 추가(예산 초과 Top3, 지출 비중 상위 카테고리)
+    - 파일: `apps/web/components/ledger-workspace.tsx`
+    - 검증: `pnpm typecheck`, `pnpm lint`, `npm run smoke` 통과
   - feature branch push 완료: `feat/multi-agent-gemma4-orchestration`
   - Draft PR 생성: `https://github.com/dhkdtjr8213/CODEX/pull/1`
 
