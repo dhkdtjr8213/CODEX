@@ -100,6 +100,8 @@ export interface RecurringExecutionLog {
   userId: string;
   scheduledFor: string;
   executedAt: string;
+  status: "pending" | "success" | "failed";
+  errorMessage?: string;
   transactionId: string | null;
   createdAt: string;
 }
@@ -443,6 +445,8 @@ export interface Database {
           user_id: string;
           scheduled_for: string;
           executed_at: string;
+          status: "pending" | "success" | "failed";
+          error_message: string | null;
           transaction_id: string | null;
           created_at: string;
         };
@@ -452,6 +456,8 @@ export interface Database {
           user_id: string;
           scheduled_for: string;
           executed_at?: string;
+          status?: "pending" | "success" | "failed";
+          error_message?: string | null;
           transaction_id?: string | null;
           created_at?: string;
         };
@@ -461,6 +467,8 @@ export interface Database {
           user_id?: string;
           scheduled_for?: string;
           executed_at?: string;
+          status?: "pending" | "success" | "failed";
+          error_message?: string | null;
           transaction_id?: string | null;
           created_at?: string;
         };

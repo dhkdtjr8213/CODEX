@@ -1,4 +1,4 @@
-﻿create table if not exists public.recurring_transaction_executions (
+create table if not exists public.recurring_transaction_executions (
   id uuid primary key default gen_random_uuid(),
   recurring_transaction_id uuid not null references public.recurring_transactions(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,

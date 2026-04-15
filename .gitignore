@@ -1,5 +1,6 @@
 node_modules
 .pnpm-store
+.npm-cache
 .turbo
 .next
 dist
@@ -19,3 +20,9 @@ web-build
 
 .DS_Store
 .codex
+supabase/.temp
+work/tasks/*
+!work/tasks/.gitkeep
+
+harness/__pycache__/
+*.pyc

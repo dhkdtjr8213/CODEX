@@ -37,7 +37,8 @@ import {
   saveCategory,
   saveProfileSettings,
   saveRecurringTransaction,
-  saveTransaction
+  saveTransaction,
+  updateTransactionsCategory
 } from "@household/supabase";
 import {
   ACCOUNT_TYPE_OPTIONS,
@@ -221,6 +222,7 @@ const WORKSPACE_VIEW_VALUES: WorkspaceView[] = [
   "manage",
   "settings"
 ];
+type SavedFilterPreset = "salary_day" | "fixed_cost" | "meal_expense";
 
 export function LedgerWorkspace({
   initialSnapshot
@@ -247,6 +249,7 @@ export function LedgerWorkspace({
     "account_category",
     "memo"
   ]);
+  const [selectedBulkCategoryId, setSelectedBulkCategoryId] = useState("");
   const [transactionPageSize, setTransactionPageSize] = useState(TRANSACTION_PAGE_SIZE);
   const [transactionPage, setTransactionPage] = useState(1);
   const [selectedTransactionIds, setSelectedTransactionIds] = useState<string[]>([]);
@@ -1025,6 +1028,40 @@ export function LedgerWorkspace({
     () => sortedTransactions.filter((item) => selectedTransactionIds.includes(item.id)),
     [selectedTransactionIds, sortedTransactions]
   );
+  const bulkAssignableCategories = useMemo(
+    () => (ledger?.categories ?? []).filter((item) => item.kind === "expense" || item.kind === "income"),
+    [ledger?.categories]
+  );
+  const applySavedFilterPreset = useCallback((preset: SavedFilterPreset) => {
+    const thisMonth = getPresetRange("this_month");
+    setPeriodPreset("this_month");
+    setStartDate(thisMonth.startDate);
+    setEndDate(thisMonth.endDate);
+    setAccountFilter("");
+    setCategoryFilter("");
+    setSortDirection("desc");
+    setTransactionSort("occurredAt");
+    setTransactionPage(1);
+
+    if (preset === "salary_day") {
+      setTypeFilter("income");
+      setSearchInput("월급");
+      return;
+    }
+
+    if (preset === "fixed_cost") {
+      setTypeFilter("expense");
+      setSearchInput("고정");
+      return;
+    }
+
+    const mealCategory = (ledger?.categories ?? []).find(
+      (item) => item.kind === "expense" && item.name.includes("식비")
+    );
+    setTypeFilter("expense");
+    setSearchInput(mealCategory ? "" : "식비");
+    setCategoryFilter(mealCategory?.id ?? "");
+  }, [ledger?.categories]);
   const bulkDeleteSelectedTransactions = useCallback(async () => {
     if (!selectedTransactions.length) {
       return;
@@ -1052,6 +1089,60 @@ export function LedgerWorkspace({
       );
     }
   }, [refreshLedger, selectedTransactions, showToast, webClient]);
+  const bulkUpdateSelectedTransactionCategory = useCallback(async () => {
+    if (!selectedTransactions.length) {
+      showToast("error", "먼저 거래를 선택해주세요.");
+      return;
+    }
+
+    if (!selectedBulkCategoryId) {
+      showToast("error", "일괄 적용할 카테고리를 선택해주세요.");
+      return;
+    }
+
+    if (!webClient) {
+      showToast("error", "웹용 Supabase 환경변수를 확인해주세요.");
+      return;
+    }
+
+    const category = (ledger?.categories ?? []).find((item) => item.id === selectedBulkCategoryId);
+    if (!category) {
+      showToast("error", "선택한 카테고리를 찾을 수 없습니다.");
+      return;
+    }
+
+    const applicableIds = selectedTransactions
+      .filter((item) => (item.type === "income" || item.type === "expense") && item.type === category.kind)
+      .map((item) => item.id);
+    const skippedCount = selectedTransactions.length - applicableIds.length;
+
+    if (!applicableIds.length) {
+      showToast("error", "선택한 거래와 카테고리 유형이 맞지 않습니다.");
+      return;
+    }
+
+    try {
+      setActionError("");
+      const updatedCount = await updateTransactionsCategory(
+        webClient,
+        applicableIds,
+        selectedBulkCategoryId
+      );
+      setSelectedTransactionIds((prev) => prev.filter((id) => !applicableIds.includes(id)));
+      showToast(
+        "success",
+        `${updatedCount}건 카테고리를 변경했습니다.${skippedCount > 0 ? ` (${skippedCount}건 제외)` : ""}`
+      );
+      await refreshLedger();
+    } catch (nextError) {
+      showToast("error", "일괄 카테고리 변경 중 오류가 발생했습니다.");
+      setActionError(
+        nextError instanceof Error
+          ? nextError.message
+          : "일괄 카테고리 변경 중 오류가 발생했습니다."
+      );
+    }
+  }, [ledger?.categories, refreshLedger, selectedBulkCategoryId, selectedTransactions, showToast, webClient]);
   const toggleWidgetCollapsed = useCallback((widget: DashboardWidget) => {
     setCollapsedWidgets((prev) =>
       prev.includes(widget) ? prev.filter((item) => item !== widget) : [...prev, widget]
@@ -1159,6 +1250,20 @@ export function LedgerWorkspace({
     { value: "manage", label: "관리", description: "계정/카테고리/예산/반복거래" },
     { value: "settings", label: "설정", description: "표시 및 기본 환경" }
   ];
+  const manageSections: Array<{
+    key: ManageSection;
+    label: string;
+    description: string;
+  }> = [
+    { key: "transaction", label: "빠른 입력", description: "오늘 거래 빠르게 등록" },
+    { key: "account", label: "계정", description: "계좌/지갑 목록 관리" },
+    { key: "category", label: "카테고리", description: "수입/지출 분류 관리" },
+    { key: "budget", label: "예산", description: "월별 카테고리 예산 관리" },
+    { key: "recurring", label: "반복거래", description: "정기 거래 자동 반영 준비" },
+    { key: "logs", label: "실행로그", description: "반복 배치 실행 상태 확인" }
+  ];
+  const manageSectionMeta =
+    manageSections.find((item) => item.key === manageSection) ?? manageSections[0];
   const activeViewMeta =
     workspaceViews.find((view) => view.value === activeView) ?? workspaceViews[0];
 
@@ -1181,6 +1286,17 @@ export function LedgerWorkspace({
     setActiveView("manage");
     setManageSection("transaction");
   }, [filteredTransactions, transactionForm]);
+  const openQuickAddForDate = useCallback((dateKey: string) => {
+    const current = transactionForm.getValues();
+    transactionForm.reset({
+      ...current,
+      id: undefined,
+      occurredAt: dateKey
+    });
+    setActiveView("manage");
+    setManageSection("transaction");
+    showToast("success", "선택 날짜로 빠른 입력 화면을 열었습니다.");
+  }, [showToast, transactionForm]);
 
   const deleteTransactionById = useCallback(async (id: string) => {
     try {
@@ -1476,6 +1592,33 @@ export function LedgerWorkspace({
             </p>
           ) : null}
 
+          <div className={`mt-4 rounded-2xl border border-stone-200 bg-white px-3 py-3 ${activeView === "transactions" ? "" : "hidden"}`}>
+            <p className="text-xs font-medium text-stone-600">{"저장 필터 프리셋"}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                className="rounded-full border border-stone-300 px-3 py-1.5 text-xs"
+                onClick={() => applySavedFilterPreset("salary_day")}
+                type="button"
+              >
+                {"월급일"}
+              </button>
+              <button
+                className="rounded-full border border-stone-300 px-3 py-1.5 text-xs"
+                onClick={() => applySavedFilterPreset("fixed_cost")}
+                type="button"
+              >
+                {"고정비"}
+              </button>
+              <button
+                className="rounded-full border border-stone-300 px-3 py-1.5 text-xs"
+                onClick={() => applySavedFilterPreset("meal_expense")}
+                type="button"
+              >
+                {"식비"}
+              </button>
+            </div>
+          </div>
+
           <div className={`mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3 ${activeView === "transactions" ? "" : "hidden"}`}>
             <input
               className="rounded-2xl border border-stone-200 px-4 py-3 text-sm"
@@ -1616,6 +1759,7 @@ export function LedgerWorkspace({
                 loading={loading}
                 onDelete={(id) => void deleteTransactionById(id)}
                 onEdit={prefillTransactionForm}
+                onQuickAdd={openQuickAddForDate}
                 transactions={sortedTransactions}
               />
             </div>
@@ -1723,6 +1867,26 @@ export function LedgerWorkspace({
                     {"메모"}
                   </button>
                   <span className="ml-auto text-stone-500">{`선택 ${selectedTransactionIds.length}건`}</span>
+                  <select
+                    className="rounded-full border border-stone-300 px-3 py-1"
+                    onChange={(event) => setSelectedBulkCategoryId(event.target.value)}
+                    value={selectedBulkCategoryId}
+                  >
+                    <option value="">{"카테고리 일괄 변경"}</option>
+                    {bulkAssignableCategories.map((item) => (
+                      <option key={`bulk-category-${item.id}`} value={item.id}>
+                        {`${item.kind === "income" ? "수입" : "지출"} · ${item.name}`}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="rounded-full border border-stone-300 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-40"
+                    disabled={!selectedTransactions.length || !selectedBulkCategoryId}
+                    onClick={() => void bulkUpdateSelectedTransactionCategory()}
+                    type="button"
+                  >
+                    {"일괄 카테고리 변경"}
+                  </button>
                   <button
                     className="rounded-full border border-stone-300 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-40"
                     disabled={!selectedTransactions.length}
@@ -1904,32 +2068,6 @@ export function LedgerWorkspace({
       </div>
 
       <div className={`flex flex-col gap-6 ${activeView === "manage" ? "" : "hidden"}`} id="web-manage">
-        <div className="rounded-2xl border border-stone-200 bg-white p-3">
-          <div className="flex flex-wrap gap-2">
-            {[
-              { key: "transaction", label: "빠른 입력" },
-              { key: "account", label: "계정" },
-              { key: "category", label: "카테고리" },
-              { key: "budget", label: "예산" },
-              { key: "recurring", label: "반복거래" },
-              { key: "logs", label: "실행로그" }
-            ].map((item) => (
-              <button
-                key={item.key}
-                className={`rounded-full px-4 py-2 text-sm ${
-                  manageSection === item.key
-                    ? "bg-[color:var(--point)] text-white"
-                    : "border border-stone-300 bg-white text-stone-700"
-                }`}
-                onClick={() => setManageSection(item.key as ManageSection)}
-                type="button"
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {loading ? (
           <p className="rounded-2xl bg-stone-100 px-4 py-3 text-sm text-stone-600">
             {"관리 데이터를 불러오는 중입니다."}
@@ -1941,6 +2079,38 @@ export function LedgerWorkspace({
             {error}
           </p>
         ) : null}
+
+        <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+          <aside className="h-fit rounded-2xl border border-stone-200 bg-white p-3 lg:sticky lg:top-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">
+              {"관리 메뉴"}
+            </p>
+            <div className="mt-3 flex flex-col gap-2">
+              {manageSections.map((item) => (
+                <button
+                  key={`manage-aside-${item.key}`}
+                  className={`rounded-xl px-3 py-2 text-left text-sm transition ${
+                    manageSection === item.key
+                      ? "bg-[color:var(--point)] text-white shadow-[0_8px_18px_rgba(21,93,73,0.2)]"
+                      : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                  }`}
+                  onClick={() => setManageSection(item.key)}
+                  type="button"
+                >
+                  <p className="font-semibold">{item.label}</p>
+                  <p className={`mt-0.5 text-xs ${manageSection === item.key ? "text-white/80" : "text-stone-500"}`}>
+                    {item.description}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </aside>
+
+          <div className="flex flex-col gap-6">
+            <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700">
+              <span className="font-semibold">{manageSectionMeta.label}</span>
+              {` · ${manageSectionMeta.description}`}
+            </div>
 
         <div className={manageSection === "transaction" ? "" : "hidden"}>
         <FormSection title="빠른 거래 입력">
@@ -2275,6 +2445,8 @@ export function LedgerWorkspace({
           items={ledger?.recurringExecutionLogs ?? []}
           loading={recurringExecutionLoading}
         />
+        </div>
+          </div>
         </div>
       </div>
       </section>

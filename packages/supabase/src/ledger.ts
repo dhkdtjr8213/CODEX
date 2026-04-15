@@ -190,6 +190,8 @@ function mapRecurringExecutionLog(
     userId: row.user_id,
     scheduledFor: row.scheduled_for,
     executedAt: row.executed_at,
+    status: row.status,
+    errorMessage: row.error_message ?? undefined,
     transactionId: row.transaction_id,
     createdAt: row.created_at
   };
@@ -426,6 +428,33 @@ export async function deleteBudget(
   if (error) {
     throw error;
   }
+}
+
+export async function updateTransactionsCategory(
+  client: SupabaseClient<Database>,
+  ids: string[],
+  categoryId: string
+): Promise<number> {
+  if (!ids.length) {
+    return 0;
+  }
+
+  const { data, error } = await client
+    .from("transactions")
+    .update({
+      category_id: categoryId,
+      transfer_account_id: null
+    })
+    .in("id", ids)
+    .in("type", ["income", "expense"])
+    .is("deleted_at", null)
+    .select("id");
+
+  if (error) {
+    throw error;
+  }
+
+  return data?.length ?? 0;
 }
 
 export async function listRecurringTransactions(

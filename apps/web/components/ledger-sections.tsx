@@ -36,9 +36,9 @@ export type RecurringExecutionLogItem = {
   recurringTransactionId: string;
   scheduledFor: string;
   executedAt: string;
+  status: "pending" | "success" | "failed";
   transactionId: string | null;
-  message?: string;
-  error?: string;
+  errorMessage?: string;
 };
 
 function formatExecutionDateTime(value: string) {
@@ -56,8 +56,7 @@ function normalizeExecutionFailureReason(value: unknown) {
 
 function getExecutionFailureReason(item: RecurringExecutionLogItem) {
   return (
-    normalizeExecutionFailureReason(item.message) ??
-    normalizeExecutionFailureReason(item.error)
+    normalizeExecutionFailureReason(item.errorMessage)
   );
 }
 
@@ -73,7 +72,7 @@ function summarizeRecurringExecutionLogs(items: RecurringExecutionLogItem[]) {
 
   for (const item of items) {
     const executedAt = dayjs(item.executedAt);
-    const isSuccess = Boolean(item.transactionId);
+    const isSuccess = item.status === "success";
     if (isSuccess) {
       totalSuccessCount += 1;
     } else {
@@ -768,13 +767,14 @@ export function RecurringExecutionPanel({
 }) {
   const hasItems = items.length > 0;
   const summary = summarizeRecurringExecutionLogs(items);
-  const failureLogItems = items.filter((item) => !item.transactionId);
+  const failureLogItems = items.filter((item) => item.status === "failed");
   const [failureReasonQuery, setFailureReasonQuery] = React.useState("");
   const [failurePeriodFilter, setFailurePeriodFilter] = React.useState<"7d" | "30d" | "all">("all");
   const [failureReasonStateFilter, setFailureReasonStateFilter] = React.useState<
     "all" | "with_reason" | "without_reason"
   >("all");
   const [isFilterHydrated, setIsFilterHydrated] = React.useState(false);
+  const [rerunGuideCopied, setRerunGuideCopied] = React.useState(false);
   const normalizedFailureReasonQuery = failureReasonQuery.trim().toLowerCase();
   const filteredFailureLogItems = React.useMemo(() => {
     const now = Date.now();
@@ -916,6 +916,18 @@ export function RecurringExecutionPanel({
     window.history.replaceState(null, "", nextUrl);
   }, [failurePeriodFilter, failureReasonQuery, failureReasonStateFilter, isFilterHydrated]);
 
+  React.useEffect(() => {
+    if (!rerunGuideCopied) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setRerunGuideCopied(false);
+    }, 1800);
+
+    return () => window.clearTimeout(timeout);
+  }, [rerunGuideCopied]);
+
   return (
     <section className="rounded-[24px] bg-card p-6 shadow-sm">
       <h2 className="text-xl font-semibold">{"반복배치 실행 로그"}</h2>
@@ -949,6 +961,33 @@ export function RecurringExecutionPanel({
             <span className="font-medium text-stone-700">{"실패 사유 요약: "}</span>
             {summary.failureReasonSummary}
           </p>
+          <div className="mt-3 rounded-2xl border border-stone-200 bg-white px-4 py-3">
+            <p className="text-xs font-medium text-stone-600">{"배치 재실행"}</p>
+            <p className="mt-1 text-sm text-stone-700">
+              {"실패 원인을 정리한 뒤 아래 명령으로 dry-run을 다시 확인하세요."}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <code className="rounded-md bg-stone-100 px-2 py-1 text-xs">
+                {"pnpm ops:check-recurring-batch"}
+              </code>
+              <button
+                className="rounded-full border border-stone-300 px-3 py-1 text-xs"
+                onClick={() => {
+                  if (typeof window === "undefined") {
+                    return;
+                  }
+
+                  navigator.clipboard
+                    .writeText("pnpm ops:check-recurring-batch")
+                    .then(() => setRerunGuideCopied(true))
+                    .catch(() => setRerunGuideCopied(false));
+                }}
+                type="button"
+              >
+                {rerunGuideCopied ? "복사됨" : "명령 복사"}
+              </button>
+            </div>
+          </div>
           <details className="mt-3 rounded-2xl border border-stone-200 bg-white">
             <summary className="cursor-pointer list-none rounded-2xl px-4 py-3 text-sm font-medium text-stone-700">
               {`실패 로그 상세 보기 (최근 ${Math.min(recentFailureLogItems.length, 5)}건)`}
@@ -1101,12 +1140,18 @@ export function RecurringExecutionPanel({
                 </div>
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-medium ${
-                    item.transactionId
+                    item.status === "success"
                       ? "bg-emerald-50 text-emerald-700"
-                      : "bg-stone-100 text-stone-600"
+                      : item.status === "failed"
+                        ? "bg-rose-50 text-rose-700"
+                        : "bg-stone-100 text-stone-600"
                   }`}
                 >
-                  {item.transactionId ? "생성 거래 있음" : "생성 거래 없음"}
+                  {item.status === "success"
+                    ? "성공"
+                    : item.status === "failed"
+                      ? "실패"
+                      : "대기"}
                 </span>
               </div>
 
@@ -1127,6 +1172,14 @@ export function RecurringExecutionPanel({
                   <dt className="text-xs text-stone-500">{"생성 거래 ID 유무"}</dt>
                   <dd className="mt-1 text-sm font-medium text-stone-800">
                     {item.transactionId ? "있음" : "없음"}
+                  </dd>
+                </div>
+                <div className="rounded-2xl bg-stone-50 px-4 py-3 sm:col-span-3">
+                  <dt className="text-xs text-stone-500">{"실패 원인"}</dt>
+                  <dd className="mt-1 text-sm font-medium text-stone-800">
+                    {item.status === "failed"
+                      ? getExecutionFailureReason(item) ?? "알 수 없는 오류"
+                      : "-"}
                   </dd>
                 </div>
               </dl>

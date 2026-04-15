@@ -26,13 +26,15 @@ export function MonthlyCalendarPanel({
   transactions,
   loading,
   onEdit,
-  onDelete
+  onDelete,
+  onQuickAdd
 }: {
   categories: Category[];
   transactions: TransactionItem[];
   loading: boolean;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onQuickAdd: (dateKey: string) => void;
 }) {
   const [monthKey, setMonthKey] = useState(dayjs().format("YYYY-MM"));
   const [selectedDateKey, setSelectedDateKey] = useState(dayjs().format("YYYY-MM-DD"));
@@ -72,6 +74,35 @@ export function MonthlyCalendarPanel({
       count: monthTransactions.length
     };
   }, [monthTransactions]);
+  const categoryHighlights = useMemo(() => {
+    const categorySpendMap = new Map<string, { amount: number; name: string; color: string }>();
+
+    for (const item of monthTransactions) {
+      if (!item.categoryId || item.type !== "expense") {
+        continue;
+      }
+
+      const current = categorySpendMap.get(item.categoryId);
+      const category = categories.find((entry) => entry.id === item.categoryId);
+      const nextName = item.categoryName ?? category?.name ?? "미분류";
+      const nextColor = category?.color ?? "#94a3b8";
+
+      if (!current) {
+        categorySpendMap.set(item.categoryId, {
+          amount: item.amount,
+          name: nextName,
+          color: nextColor
+        });
+        continue;
+      }
+
+      current.amount += item.amount;
+    }
+
+    return [...categorySpendMap.values()]
+      .sort((left, right) => right.amount - left.amount)
+      .slice(0, 4);
+  }, [categories, monthTransactions]);
 
   const transactionByDate = useMemo(() => {
     const map = new Map<string, TransactionItem[]>();
@@ -348,6 +379,13 @@ export function MonthlyCalendarPanel({
           <p className="mt-1 text-xs text-stone-500">
             {"날짜를 바꿔가며 거래 흐름을 빠르게 점검하세요."}
           </p>
+          <button
+            className="mt-3 w-full rounded-xl border border-[color:var(--point)] bg-[color:var(--point-soft)] px-3 py-2 text-sm font-medium text-[color:var(--point-strong)]"
+            onClick={() => onQuickAdd(selectedDateKey)}
+            type="button"
+          >
+            {"선택 날짜로 빠른 입력"}
+          </button>
 
           <input
             className="mt-3 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
@@ -355,6 +393,26 @@ export function MonthlyCalendarPanel({
             placeholder="메모/카테고리 검색"
             value={detailSearch}
           />
+
+          {categoryHighlights.length ? (
+            <div className="mt-3 rounded-xl bg-stone-50 px-3 py-3">
+              <p className="text-xs font-medium text-stone-600">{"지출 카테고리 강조"}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {categoryHighlights.map((item) => (
+                  <span
+                    key={`highlight-${item.name}`}
+                    className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-[11px] text-stone-700"
+                  >
+                    <span
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    {`${item.name} ${formatCurrency(item.amount)}`}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {!filteredSelectedItems.length ? (
             <p className="mt-3 rounded-xl bg-stone-100 px-3 py-3 text-sm text-stone-600">

@@ -25,12 +25,14 @@
 ## 4. DB / 마이그레이션
 - `supabase/migrations/0001_mvp_auth_and_ledger.sql` 적용
 - `supabase/migrations/0002_recurring_execution_batch.sql` 적용
+- `supabase/migrations/0003_recurring_execution_failure_details.sql` 적용
 - RLS 정책 활성 상태 확인
 - 반복거래 실행 함수/로그 테이블 생성 확인
 
 ## 5. 반복배치 운영 연결
 - [recurring-batch-scheduler.md](./recurring-batch-scheduler.md) 순서로 배치 연결
 - 운영 시크릿 설정 후 `pnpm ops:check-recurring-batch`로 dry-run 검증
+- 필요 시 `pnpm ops:check-recurring-batch --execute`로 실제 실행 검증
 - 실제 실행 후 `transactions` 생성 및 `recurring_transaction_executions` 로그 확인
 
 ## 6. 핵심 사용자 흐름 검증
@@ -42,5 +44,29 @@
 
 ## 7. 배포 직전
 - `pnpm ops:preflight`
+- preflight 실행 후 자동 생성되는 최신 리포트 확인: [manual-kit/preflight-last-report.md](./manual-kit/preflight-last-report.md)
 - 에러/로딩/빈 상태 화면 점검
 - 첫 화면(이번 달 수지, 최근 내역, 빠른 입력) 노출 확인
+
+### preflight 자동 요약
+<!-- PRECHECK:START -->
+
+- 마지막 실행 시각: 2026-04-15T01:53:58.187Z
+- 자동 판정: PASS
+- 단계 요약:
+  - Runtime env validation: ok
+  - Recurring batch dry-run check: ok
+- 누락 env:
+  - 없음
+<!-- PRECHECK:END -->
+
+## 8. GitHub 보호/CI 권장값
+- `main` 브랜치 보호 규칙
+  - Pull Request 필수
+  - 직접 push 제한
+  - 필수 상태 검사 통과 후 merge
+- 상세 설정 절차: [github-branch-protection.md](./github-branch-protection.md)
+- 필수 상태 검사 항목
+  - `Typecheck`
+  - `Lint`
+  - `Smoke`
