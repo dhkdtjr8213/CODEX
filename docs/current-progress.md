@@ -70,7 +70,8 @@
   - 리포트: `docs/manual-kit/pr-rehearsal-last-report.md`
 
 ## 다음 작업 순서
-1. feature 브랜치 생성 후 실제 Draft PR 1건 열기(리허설 결과 확인)
+1. Draft PR 리뷰 반영 및 merge 준비
+   - PR: `https://github.com/dhkdtjr8213/CODEX/pull/1`
 2. 필요 시 `HARNESS_QUICK_MODE=0`로 전체 오케스트레이터 장시간 검증
 
 ## 관련 문서
