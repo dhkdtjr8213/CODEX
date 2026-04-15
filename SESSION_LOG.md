@@ -109,6 +109,14 @@
   - 최종 PR 리허설 재실행 통과
     - 명령: `pnpm ops:pr-rehearsal`
     - 리포트: `docs/manual-kit/pr-rehearsal-last-report.md` 갱신
+  - OAuth Google 로그인 점검
+    - Supabase OAuth authorize URL 생성 검증 통과 (`provider=google`, `redirect_to=http://localhost:3000/`)
+    - 웹 로그인 에러 가이드 메시지 상세화 (`apps/web/components/auth-panel.tsx`)
+  - 레퍼런스 기반 기능 추가
+    - Android/iOS 상위권 가계부 앱 리뷰 문서 추가: `docs/ledger-app-reference-review-2026-04-15.md`
+    - 웹 `스타터 팩` 추가: 기본 계정/카테고리 원클릭 생성 + 최초 빈 데이터 자동 1회 생성
+    - 파일: `apps/web/components/ledger-workspace.tsx`
+    - 검증: `pnpm typecheck`, `pnpm lint`, `npm run smoke` 통과
   - feature branch push 완료: `feat/multi-agent-gemma4-orchestration`
   - Draft PR 생성: `https://github.com/dhkdtjr8213/CODEX/pull/1`
 

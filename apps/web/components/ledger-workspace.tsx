@@ -99,6 +99,33 @@ const categoryDefaults: CategoryFormValues = {
   icon: ""
 };
 
+const starterAccountTemplates: Array<Pick<AccountFormValues, "name" | "type" | "balanceInput">> = [
+  { name: "현금지갑", type: "cash", balanceInput: "0" },
+  { name: "생활비 통장", type: "bank", balanceInput: "0" },
+  { name: "주거래 카드", type: "card", balanceInput: "0" },
+  { name: "비상금 통장", type: "bank", balanceInput: "0" },
+  { name: "투자 계좌", type: "investment", balanceInput: "0" }
+];
+
+const starterCategoryTemplates: Array<Pick<CategoryFormValues, "name" | "kind" | "color" | "icon">> = [
+  { name: "월급", kind: "income", color: "#0f6c66", icon: "salary" },
+  { name: "부수입", kind: "income", color: "#1f9d7a", icon: "bonus" },
+  { name: "이자/배당", kind: "income", color: "#3ea65a", icon: "interest" },
+  { name: "환급/캐시백", kind: "income", color: "#2a8f6d", icon: "cashback" },
+  { name: "식비", kind: "expense", color: "#ff7d55", icon: "food" },
+  { name: "카페/간식", kind: "expense", color: "#f29f63", icon: "cafe" },
+  { name: "교통", kind: "expense", color: "#4c89ff", icon: "transport" },
+  { name: "주거/관리비", kind: "expense", color: "#8b74ff", icon: "housing" },
+  { name: "통신", kind: "expense", color: "#4b8f8c", icon: "phone" },
+  { name: "쇼핑", kind: "expense", color: "#e96aa5", icon: "shopping" },
+  { name: "의료/건강", kind: "expense", color: "#eb5f74", icon: "health" },
+  { name: "구독", kind: "expense", color: "#7e8a9a", icon: "subscription" },
+  { name: "여가/취미", kind: "expense", color: "#ff9860", icon: "hobby" },
+  { name: "교육", kind: "expense", color: "#5f7cff", icon: "education" },
+  { name: "경조사", kind: "expense", color: "#9c6dd9", icon: "gift" },
+  { name: "기타", kind: "expense", color: "#8a8a8a", icon: "etc" }
+];
+
 const recurringDefaults: RecurringTransactionFormValues = {
   type: "expense",
   amountInput: "",
@@ -191,6 +218,10 @@ function summarizeTransactions(items: LedgerSnapshot["transactions"]): MonthlySu
   return { month: "", income, expense, transfer, balance: income - expense };
 }
 
+function normalizeTemplateName(value: string): string {
+  return value.trim().toLocaleLowerCase("ko-KR");
+}
+
 type MonthlyTrendPoint = {
   monthKey: string;
   label: string;
@@ -267,6 +298,7 @@ export function LedgerWorkspace({
   const queryClient = useQueryClient();
   const copyLockRef = useRef(false);
   const refreshLockRef = useRef(false);
+  const starterAutoApplyUserRef = useRef<string | null>(null);
 
   const accountForm = useForm<AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
@@ -322,10 +354,27 @@ export function LedgerWorkspace({
   const recurringExecutionError = "";
   const queryError = ledgerQuery.error instanceof Error ? ledgerQuery.error.message : "";
   const error = actionError || queryError;
-  const accounts = ledger?.accounts ?? [];
-  const categories = (ledger?.categories ?? []).filter(
+  const accounts = useMemo(() => ledger?.accounts ?? [], [ledger?.accounts]);
+  const allCategories = useMemo(() => ledger?.categories ?? [], [ledger?.categories]);
+  const categories = allCategories.filter(
     (item) => transactionType !== "transfer" && item.kind === transactionType
   );
+  const missingStarterAccounts = useMemo(() => {
+    const existing = new Set(accounts.map((item) => normalizeTemplateName(item.name)));
+    return starterAccountTemplates.filter(
+      (item) => !existing.has(normalizeTemplateName(item.name))
+    );
+  }, [accounts]);
+  const missingStarterCategories = useMemo(() => {
+    const existing = new Set(
+      allCategories.map(
+        (item) => `${item.kind}:${normalizeTemplateName(item.name)}`
+      )
+    );
+    return starterCategoryTemplates.filter(
+      (item) => !existing.has(`${item.kind}:${normalizeTemplateName(item.name)}`)
+    );
+  }, [allCategories]);
   const defaultFilterRange = getPresetRange("this_month");
   const hasResettableFilters =
     searchInput !== "" ||
@@ -444,6 +493,63 @@ export function LedgerWorkspace({
       await refreshLedger();
     }
   });
+
+  const applyStarterPackMutation = useMutation({
+    mutationFn: async () => {
+      if (!webClient || !authSnapshot.userId) {
+        throw new Error("로그인 상태를 확인해주세요.");
+      }
+
+      for (const account of missingStarterAccounts) {
+        await saveAccount(webClient, authSnapshot.userId, account);
+      }
+
+      for (const category of missingStarterCategories) {
+        await saveCategory(webClient, authSnapshot.userId, category);
+      }
+    },
+    onSuccess: async () => {
+      const createdAccountCount = missingStarterAccounts.length;
+      const createdCategoryCount = missingStarterCategories.length;
+      showToast(
+        "success",
+        `스타터 팩 적용 완료: 계정 ${createdAccountCount}개, 카테고리 ${createdCategoryCount}개`
+      );
+      await refreshLedger();
+    }
+  });
+
+  useEffect(() => {
+    if (!authSnapshot.isAuthenticated || !authSnapshot.userId) {
+      return;
+    }
+
+    if (!webClient || !ledger) {
+      return;
+    }
+
+    if (accounts.length > 0 || allCategories.length > 0) {
+      return;
+    }
+
+    if (
+      applyStarterPackMutation.isPending ||
+      starterAutoApplyUserRef.current === authSnapshot.userId
+    ) {
+      return;
+    }
+
+    starterAutoApplyUserRef.current = authSnapshot.userId;
+    void applyStarterPackMutation.mutateAsync();
+  }, [
+    accounts.length,
+    allCategories.length,
+    applyStarterPackMutation,
+    authSnapshot.isAuthenticated,
+    authSnapshot.userId,
+    ledger,
+    webClient
+  ]);
 
   const saveBudgetMutation = useMutation({
     mutationFn: async (values: BudgetFormValues) => {
@@ -2114,6 +2220,59 @@ export function LedgerWorkspace({
 
         <div className={manageSection === "transaction" ? "" : "hidden"}>
         <FormSection title="빠른 거래 입력">
+          <div className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-4">
+            <p className="text-sm font-semibold text-[var(--foreground)]">
+              {"추천 스타터 팩 (상위 가계부 앱 공통 구조)"}
+            </p>
+            <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+              {`기본 계정 ${missingStarterAccounts.length}개, 카테고리 ${missingStarterCategories.length}개를 한 번에 추가할 수 있습니다.`}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              {missingStarterAccounts.slice(0, 3).map((item) => (
+                <span key={`starter-account-${item.name}`} className="rounded-full border border-[var(--border)] bg-white px-3 py-1">
+                  {`계정 · ${item.name}`}
+                </span>
+              ))}
+              {missingStarterCategories.slice(0, 5).map((item) => (
+                <span key={`starter-category-${item.kind}-${item.name}`} className="rounded-full border border-[var(--border)] bg-white px-3 py-1">
+                  {`${item.kind === "income" ? "수입" : "지출"} · ${item.name}`}
+                </span>
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                className="rounded-full bg-[var(--point)] px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,108,102,0.24)] transition hover:bg-[var(--point-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={
+                  applyStarterPackMutation.isPending ||
+                  (missingStarterAccounts.length === 0 && missingStarterCategories.length === 0)
+                }
+                onClick={() => void applyStarterPackMutation.mutateAsync()}
+                type="button"
+              >
+                {applyStarterPackMutation.isPending ? "적용 중..." : "스타터 팩 자동 추가"}
+              </button>
+              <button
+                className="rounded-full border border-[var(--border)] px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={applyStarterPackMutation.isPending}
+                onClick={() => {
+                  setManageSection("account");
+                }}
+                type="button"
+              >
+                {"계정 직접 관리"}
+              </button>
+              <button
+                className="rounded-full border border-[var(--border)] px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={applyStarterPackMutation.isPending}
+                onClick={() => {
+                  setManageSection("category");
+                }}
+                type="button"
+              >
+                {"카테고리 직접 관리"}
+              </button>
+            </div>
+          </div>
           <TransactionFormPanel
             accounts={accounts}
             categories={categories}

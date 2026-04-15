@@ -25,6 +25,28 @@ interface AuthPanelProps {
   initialSnapshot: AuthSessionSnapshot;
 }
 
+function mapGoogleAuthErrorMessage(raw: string): string {
+  const text = raw.toLowerCase();
+
+  if (text.includes("redirect_uri_mismatch") || text.includes("invalid request")) {
+    return "Google OAuth 리디렉트 설정이 맞지 않습니다. Supabase Auth URL 설정과 Google Cloud OAuth 리디렉트 URI를 확인해 주세요.";
+  }
+
+  if (text.includes("provider is not enabled") || text.includes("unsupported provider")) {
+    return "Supabase에서 Google Provider가 비활성화되어 있습니다. Authentication > Providers > Google을 활성화해 주세요.";
+  }
+
+  if (text.includes("access_denied")) {
+    return "Google 로그인 창에서 권한이 거부되었습니다. 다시 시도해 주세요.";
+  }
+
+  if (text.includes("popup")) {
+    return "브라우저 팝업/리다이렉트가 차단되었습니다. 팝업 차단 해제 후 다시 시도해 주세요.";
+  }
+
+  return raw;
+}
+
 export function AuthPanel({ initialSnapshot }: AuthPanelProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -165,7 +187,7 @@ export function AuthPanel({ initialSnapshot }: AuthPanelProps) {
 
     if (error) {
       setLoading(false);
-      setMessage(error.message);
+      setMessage(mapGoogleAuthErrorMessage(error.message));
       return;
     }
 
