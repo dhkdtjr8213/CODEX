@@ -94,6 +94,10 @@
   - Python 탐색 로직 반영 후 `pnpm ops:pr-rehearsal` 재실행 통과
   - `pnpm ops:progress` 재실행 결과 16/16 (100%) 확인
   - PR 상태 재확인: #1 `draft/open`, `mergeable=true`, head=`4fd1a193...`
+  - 플레이스토어 벤치마크 기반 웹 상단 디자인 상향 적용
+    - 파일: `apps/web/app/page.tsx`, `apps/web/app/globals.css`
+    - 기준 문서: `docs/design-benchmark-playstore.md`
+    - 검증: `pnpm typecheck`, `pnpm lint`, `npm run smoke` 통과
   - feature branch push 완료: `feat/multi-agent-gemma4-orchestration`
   - Draft PR 생성: `https://github.com/dhkdtjr8213/CODEX/pull/1`
 
