@@ -122,6 +122,10 @@
     - `월간 인사이트 카드` 추가(예산 초과 Top3, 지출 비중 상위 카테고리)
     - 파일: `apps/web/components/ledger-workspace.tsx`
     - 검증: `pnpm typecheck`, `pnpm lint`, `npm run smoke` 통과
+  - 인증 패널 텍스트/UX 정리
+    - `apps/web/components/auth-panel.tsx` 한글 깨짐(mojibake) 전면 복구
+    - Google OAuth 실패 원인별 안내 문구 유지 + 인증/버튼/상태 카드 카피 정돈
+    - 검증: `pnpm --filter web lint`, `pnpm typecheck`, `npm run smoke` 통과
   - feature branch push 완료: `feat/multi-agent-gemma4-orchestration`
   - Draft PR 생성: `https://github.com/dhkdtjr8213/CODEX/pull/1`
 
