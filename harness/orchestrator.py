@@ -30,6 +30,39 @@ DEPENDENCY_ORDER = [
     "packages/ui",
     "apps/web + apps/mobile",
 ]
+ARTIFACT_ORDER = [
+    "chief_kickoff",
+    "task_breakdown",
+    "spec",
+    "types_lockdown",
+    "backend",
+    "designer",
+    "frontend_web",
+    "frontend_mobile",
+    "tester",
+    "reviewer",
+    "security",
+    "chief_final",
+]
+ROLE_ARTIFACT_SCOPE = {
+    "deputy": ["chief_kickoff"],
+    "planner": ["chief_kickoff", "task_breakdown"],
+    "types": ["task_breakdown", "spec"],
+    "backend": ["task_breakdown", "spec", "types_lockdown"],
+    "designer": ["task_breakdown", "spec", "types_lockdown"],
+    "frontend-web": ["spec", "types_lockdown", "backend", "designer"],
+    "frontend-mobile": ["spec", "types_lockdown", "backend", "designer"],
+    "tester": ["spec", "types_lockdown", "backend", "designer", "frontend_web", "frontend_mobile"],
+    "reviewer": ["spec", "types_lockdown", "backend", "designer", "frontend_web", "frontend_mobile"],
+    "security": ["spec", "types_lockdown", "backend", "designer", "frontend_web", "frontend_mobile"],
+    # chief final decision only needs condensed upstream artifacts; kickoff has none yet.
+    "chief": [
+        "spec",
+        "tester",
+        "reviewer",
+        "security",
+    ],
+}
 
 
 def now_iso() -> str:
@@ -63,6 +96,43 @@ def load_skill(role: str) -> str:
     if not skill_path.exists():
         raise FileNotFoundError(f"SKILL.md not found for role '{role}': {skill_path}")
     return skill_path.read_text(encoding="utf-8")
+
+
+def resolve_artifact_char_limit() -> int:
+    raw = os.getenv("HARNESS_ARTIFACT_CHAR_LIMIT", "1800").strip()
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return 1800
+    return max(500, min(20000, parsed))
+
+
+def clip_text(value: str, limit: int) -> str:
+    if len(value) <= limit:
+        return value
+    return f"{value[:limit]}\n\n[truncated {len(value) - limit} chars]"
+
+
+def resolve_role_timeout_sec() -> int:
+    raw = os.getenv("HARNESS_ROLE_TIMEOUT_SEC", "90").strip()
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return 90
+    return max(30, min(900, parsed))
+
+
+def resolve_max_consecutive_failures() -> int:
+    raw = os.getenv("HARNESS_MAX_CONSECUTIVE_FAILURES", "3").strip()
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return 3
+    return max(0, min(12, parsed))
+
+
+def resolve_disable_parallel() -> bool:
+    return os.getenv("HARNESS_DISABLE_PARALLEL", "0").strip() == "1"
 
 
 def task_dir(task_id: str) -> pathlib.Path:
@@ -109,24 +179,13 @@ def build_context_block(state: TaskState) -> str:
 
 def build_agent_input(state: TaskState, role: str) -> str:
     context = build_context_block(state)
+    artifact_char_limit = resolve_artifact_char_limit()
     prior_artifacts = []
-    artifact_order = [
-        "chief_kickoff",
-        "task_breakdown",
-        "spec",
-        "types_lockdown",
-        "backend",
-        "designer",
-        "frontend_web",
-        "frontend_mobile",
-        "tester",
-        "reviewer",
-        "security",
-        "chief_final",
-    ]
-    for key in artifact_order:
+    scoped_artifacts = ROLE_ARTIFACT_SCOPE.get(role, ARTIFACT_ORDER)
+    for key in scoped_artifacts:
         if key in state.artifacts:
-            prior_artifacts.append(f"\n## {key}\n{state.artifacts[key]}")
+            clipped = clip_text(state.artifacts[key], artifact_char_limit)
+            prior_artifacts.append(f"\n## {key}\n{clipped}")
 
     hint = ROLE_HINTS.get(role, "Respect role scope and return structured output.")
 
@@ -193,8 +252,9 @@ class CommandRunner(BaseRunner):
     {role}, {input_file}, {output_file}, {skill_file}, {task_id}
     """
 
-    def __init__(self, command_template: str):
+    def __init__(self, command_template: str, timeout_sec: int):
         self.command_template = command_template
+        self.timeout_sec = timeout_sec
 
     def run(self, task_id: str, role: str, skill_text: str, input_text: str) -> AgentResult:
         started = now_iso()
@@ -212,13 +272,57 @@ class CommandRunner(BaseRunner):
             task_id=task_id,
         )
 
-        completed = subprocess.run(
+        process = subprocess.Popen(
             command,
             shell=True,
             cwd=str(ROOT),
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
         )
+
+        try:
+            stdout, stderr = process.communicate(timeout=self.timeout_sec)
+            completed = subprocess.CompletedProcess(
+                args=command,
+                returncode=process.returncode or 0,
+                stdout=stdout,
+                stderr=stderr,
+            )
+        except subprocess.TimeoutExpired:
+            if os.name == "nt":
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                    capture_output=True,
+                    text=True,
+                )
+            else:
+                process.kill()
+
+            try:
+                stdout, stderr = process.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                stdout = ""
+                stderr = ""
+
+            error_output = (
+                f"Runner command timed out for role={role}\n"
+                f"Timeout sec: {self.timeout_sec}\n"
+                f"Partial STDOUT:\n{stdout or ''}\n"
+                f"Partial STDERR:\n{stderr or ''}\n"
+            )
+            save_text(out_file, error_output)
+            finished = now_iso()
+            result = AgentResult(
+                role=role,
+                status="failed",
+                output_text=error_output,
+                output_file=str(out_file),
+                started_at=started,
+                finished_at=finished,
+            )
+            save_json(result_json_file(task_id, role), result.__dict__)
+            return result
 
         if completed.returncode != 0:
             error_output = (
@@ -260,6 +364,8 @@ class CommandRunner(BaseRunner):
 class Orchestrator:
     def __init__(self, runner: BaseRunner):
         self.runner = runner
+        self.max_consecutive_failures = resolve_max_consecutive_failures()
+        self.disable_parallel = resolve_disable_parallel()
 
     def init_task(self, task_id: str, goal: str) -> TaskState:
         ensure_dir(task_dir(task_id))
@@ -284,6 +390,11 @@ class Orchestrator:
     def run_parallel(self, state: TaskState, roles: List[str]) -> Dict[str, AgentResult]:
         outputs: Dict[str, AgentResult] = {}
 
+        if self.disable_parallel or len(roles) <= 1:
+            for role in roles:
+                outputs[role] = self.run_role(state, role, artifact_key=ARTIFACT_KEYS[role])
+            return outputs
+
         def _run(role: str) -> AgentResult:
             return self.run_role(state, role, artifact_key=ARTIFACT_KEYS[role])
 
@@ -295,36 +406,159 @@ class Orchestrator:
 
         return outputs
 
+    def should_abort_after_failures(self, consecutive_failures: int) -> bool:
+        if self.max_consecutive_failures <= 0:
+            return False
+        return consecutive_failures >= self.max_consecutive_failures
+
+    def stop_early(self, state: TaskState, reason: str) -> TaskState:
+        state.status = "failed"
+        state.results["orchestrator"] = {
+            "role": "orchestrator",
+            "status": "failed",
+            "output_text": reason,
+            "finished_at": now_iso(),
+        }
+        self.save_state(state)
+        return state
+
     def execute(self, task_id: str, goal: str) -> TaskState:
         state = self.init_task(task_id, goal)
         state.status = "running"
         self.save_state(state)
+        consecutive_failures = 0
+
+        def track(result: AgentResult) -> bool:
+            nonlocal consecutive_failures
+            if result.status == "success":
+                consecutive_failures = 0
+            else:
+                consecutive_failures += 1
+            return self.should_abort_after_failures(consecutive_failures)
 
         # 1) chief kickoff
-        self.run_role(state, "chief", artifact_key=ARTIFACT_KEYS["chief_kickoff"])
+        result = self.run_role(state, "chief", artifact_key=ARTIFACT_KEYS["chief_kickoff"])
+        if track(result):
+            return self.stop_early(
+                state,
+                (
+                    "Stopped early due to consecutive role failures.\n"
+                    f"- threshold: {self.max_consecutive_failures}\n"
+                    f"- last_role: chief"
+                ),
+            )
 
         # 2) deputy breakdown
-        self.run_role(state, "deputy", artifact_key=ARTIFACT_KEYS["task_breakdown"])
+        result = self.run_role(state, "deputy", artifact_key=ARTIFACT_KEYS["task_breakdown"])
+        if track(result):
+            return self.stop_early(
+                state,
+                (
+                    "Stopped early due to consecutive role failures.\n"
+                    f"- threshold: {self.max_consecutive_failures}\n"
+                    f"- last_role: deputy"
+                ),
+            )
 
         # 3) planner specification
-        self.run_role(state, "planner", artifact_key=ARTIFACT_KEYS["spec"])
+        result = self.run_role(state, "planner", artifact_key=ARTIFACT_KEYS["spec"])
+        if track(result):
+            return self.stop_early(
+                state,
+                (
+                    "Stopped early due to consecutive role failures.\n"
+                    f"- threshold: {self.max_consecutive_failures}\n"
+                    f"- last_role: planner"
+                ),
+            )
 
         # 4) types lockdown
-        self.run_role(state, "types", artifact_key=ARTIFACT_KEYS["types"])
+        result = self.run_role(state, "types", artifact_key=ARTIFACT_KEYS["types"])
+        if track(result):
+            return self.stop_early(
+                state,
+                (
+                    "Stopped early due to consecutive role failures.\n"
+                    f"- threshold: {self.max_consecutive_failures}\n"
+                    f"- last_role: types"
+                ),
+            )
 
         # 5) backend + designer in parallel
-        self.run_parallel(state, PHASE_PARALLEL_BACKEND_DESIGNER)
+        results = self.run_parallel(state, PHASE_PARALLEL_BACKEND_DESIGNER)
+        for role in PHASE_PARALLEL_BACKEND_DESIGNER:
+            result = results.get(role)
+            if not result:
+                continue
+            if track(result):
+                return self.stop_early(
+                    state,
+                    (
+                        "Stopped early due to consecutive role failures.\n"
+                        f"- threshold: {self.max_consecutive_failures}\n"
+                        f"- last_role: {role}"
+                    ),
+                )
 
         # 6) web + mobile frontend in parallel
-        self.run_parallel(state, PHASE_PARALLEL_FRONTENDS)
+        results = self.run_parallel(state, PHASE_PARALLEL_FRONTENDS)
+        for role in PHASE_PARALLEL_FRONTENDS:
+            result = results.get(role)
+            if not result:
+                continue
+            if track(result):
+                return self.stop_early(
+                    state,
+                    (
+                        "Stopped early due to consecutive role failures.\n"
+                        f"- threshold: {self.max_consecutive_failures}\n"
+                        f"- last_role: {role}"
+                    ),
+                )
 
         # 7) gates
-        self.run_role(state, "tester", artifact_key=ARTIFACT_KEYS["tester"])
-        self.run_role(state, "reviewer", artifact_key=ARTIFACT_KEYS["reviewer"])
-        self.run_role(state, "security", artifact_key=ARTIFACT_KEYS["security"])
+        result = self.run_role(state, "tester", artifact_key=ARTIFACT_KEYS["tester"])
+        if track(result):
+            return self.stop_early(
+                state,
+                (
+                    "Stopped early due to consecutive role failures.\n"
+                    f"- threshold: {self.max_consecutive_failures}\n"
+                    f"- last_role: tester"
+                ),
+            )
+        result = self.run_role(state, "reviewer", artifact_key=ARTIFACT_KEYS["reviewer"])
+        if track(result):
+            return self.stop_early(
+                state,
+                (
+                    "Stopped early due to consecutive role failures.\n"
+                    f"- threshold: {self.max_consecutive_failures}\n"
+                    f"- last_role: reviewer"
+                ),
+            )
+        result = self.run_role(state, "security", artifact_key=ARTIFACT_KEYS["security"])
+        if track(result):
+            return self.stop_early(
+                state,
+                (
+                    "Stopped early due to consecutive role failures.\n"
+                    f"- threshold: {self.max_consecutive_failures}\n"
+                    f"- last_role: security"
+                ),
+            )
 
         # 8) chief final decision
-        self.run_role(state, "chief", artifact_key=ARTIFACT_KEYS["chief_final"])
+        result = self.run_role(state, "chief", artifact_key=ARTIFACT_KEYS["chief_final"])
+        if track(result):
+            return self.stop_early(
+                state,
+                (
+                    "Stopped early due to consecutive role failures.\n"
+                    f"- threshold: {self.max_consecutive_failures}\n"
+                    f"- last_role: chief_final"
+                ),
+            )
 
         state.status = "completed"
         self.save_state(state)
@@ -354,7 +588,7 @@ def build_runner(use_mock: bool) -> BaseRunner:
             file=sys.stderr,
         )
         sys.exit(1)
-    return CommandRunner(cmd)
+    return CommandRunner(cmd, timeout_sec=resolve_role_timeout_sec())
 
 
 def main() -> None:

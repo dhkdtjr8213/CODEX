@@ -51,7 +51,7 @@
 ### preflight 자동 요약
 <!-- PRECHECK:START -->
 
-- 마지막 실행 시각: 2026-04-15T01:53:58.187Z
+- 마지막 실행 시각: 2026-04-21T02:29:50.466Z
 - 자동 판정: PASS
 - 단계 요약:
   - Runtime env validation: ok

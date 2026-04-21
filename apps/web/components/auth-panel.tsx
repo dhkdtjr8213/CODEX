@@ -67,6 +67,20 @@ export function AuthPanel({ initialSnapshot }: AuthPanelProps) {
     }
     setHasAuthClient(true);
 
+    const syncCounts = async (isAuthenticated: boolean) => {
+      if (!isAuthenticated) {
+        setCounts(emptyCounts);
+        return;
+      }
+
+      try {
+        setCounts(await fetchLedgerOverviewCounts(client));
+      } catch (error) {
+        setCounts(emptyCounts);
+        setMessage(error instanceof Error ? error.message : "요약 통계를 불러오는 중 오류가 발생했습니다.");
+      }
+    };
+
     const syncSession = async () => {
       const [{ data: sessionData }, { data: userData }] = await Promise.all([
         client.auth.getSession(),
@@ -75,12 +89,7 @@ export function AuthPanel({ initialSnapshot }: AuthPanelProps) {
 
       const nextSnapshot = toAuthSessionSnapshot("client", true, sessionData.session, userData.user);
       setSnapshot(nextSnapshot);
-
-      if (nextSnapshot.isAuthenticated) {
-        setCounts(await fetchLedgerOverviewCounts(client));
-      } else {
-        setCounts(emptyCounts);
-      }
+      await syncCounts(nextSnapshot.isAuthenticated);
     };
 
     syncSession().catch((error: unknown) => {
@@ -89,18 +98,11 @@ export function AuthPanel({ initialSnapshot }: AuthPanelProps) {
 
     const {
       data: { subscription }
-    } = client.auth.onAuthStateChange(
-      async (_event: AuthChangeEvent, session: Session | null) => {
-        const nextSnapshot = toAuthSessionSnapshot("client", true, session, session?.user ?? null);
-        setSnapshot(nextSnapshot);
-
-        if (nextSnapshot.isAuthenticated) {
-          setCounts(await fetchLedgerOverviewCounts(client));
-        } else {
-          setCounts(emptyCounts);
-        }
-      }
-    );
+    } = client.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
+      const nextSnapshot = toAuthSessionSnapshot("client", true, session, session?.user ?? null);
+      setSnapshot(nextSnapshot);
+      void syncCounts(nextSnapshot.isAuthenticated);
+    });
 
     return () => subscription.unsubscribe();
   }, []);
@@ -161,7 +163,9 @@ export function AuthPanel({ initialSnapshot }: AuthPanelProps) {
       return;
     }
 
+    setLoading(true);
     const { error } = await signOut(client);
+    setLoading(false);
     setMessage(error ? error.message : "로그아웃되었습니다.");
   };
 

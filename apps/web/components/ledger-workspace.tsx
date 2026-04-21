@@ -48,6 +48,8 @@ import {
   TRANSACTION_TYPE_OPTIONS,
 } from "@household/config";
 import {
+  monthlyInsightCopy,
+  kpiToneTokens,
   formatCurrency,
   formatDateLabel,
   getTodayInputValue
@@ -68,7 +70,6 @@ import {
   SettingsFormPanel,
   SimpleList,
   StatsPanel,
-  SummaryCards,
   TransactionFormPanel
 } from "./ledger-sections";
 
@@ -304,6 +305,7 @@ export function LedgerWorkspace({
     "trend"
   ]);
   const [collapsedWidgets, setCollapsedWidgets] = useState<DashboardWidget[]>([]);
+  const [showExtendedKpis, setShowExtendedKpis] = useState(false);
   const [startDate, setStartDate] = useState(getPresetRange("this_month").startDate);
   const [endDate, setEndDate] = useState(getPresetRange("this_month").endDate);
   const [isUrlHydrated, setIsUrlHydrated] = useState(false);
@@ -1032,6 +1034,21 @@ export function LedgerWorkspace({
   }, [ledger, transactionForm]);
 
   useEffect(() => {
+    if (transactionType === "transfer") {
+      return;
+    }
+
+    if (transactionForm.getValues("categoryId")) {
+      return;
+    }
+
+    const firstCategoryId = categories[0]?.id;
+    if (firstCategoryId) {
+      transactionForm.setValue("categoryId", firstCategoryId);
+    }
+  }, [categories, transactionForm, transactionType]);
+
+  useEffect(() => {
     profileForm.reset(toProfileFormValues(profile));
   }, [profile, profileForm]);
 
@@ -1372,6 +1389,46 @@ export function LedgerWorkspace({
   const topExpenseCategoryItems = useMemo(() => {
     return (ledger?.monthlyStats.categoryBreakdown ?? []).slice(0, 3);
   }, [ledger?.monthlyStats.categoryBreakdown]);
+  const dashboardMetricCards = useMemo(() => {
+    const summary = ledger?.summary ?? emptySummary;
+    const thisMonthExpenseTransactions = (ledger?.transactions ?? []).filter((item) => item.type === "expense").length;
+    const overspentBudgetCount = budgetInsightItems.length;
+    const dominantExpenseShare = topExpenseCategoryItems[0]?.percentage ?? 0;
+    return [
+      {
+        label: "이번 달 수입",
+        value: formatCurrency(summary.income),
+        helper: "들어온 돈",
+        tone: "normal" as const
+      },
+      {
+        label: "이번 달 지출",
+        value: formatCurrency(summary.expense),
+        helper: "나간 돈",
+        tone: "normal" as const
+      },
+      {
+        label: "이번 달 잔액",
+        value: formatCurrency(summary.balance),
+        helper: "수입 - 지출",
+        tone: summary.balance < 0 ? ("danger" as const) : ("success" as const)
+      },
+      {
+        label: "예산 위험/집중도",
+        value: `${overspentBudgetCount}개 · ${dominantExpenseShare.toFixed(1)}%`,
+        helper: `${thisMonthExpenseTransactions}건 기록`,
+        tone: overspentBudgetCount > 0 ? ("danger" as const) : ("normal" as const)
+      }
+    ];
+  }, [budgetInsightItems.length, ledger?.summary, ledger?.transactions, topExpenseCategoryItems]);
+  const primaryDashboardMetricCards = useMemo(
+    () => dashboardMetricCards.slice(0, 3),
+    [dashboardMetricCards]
+  );
+  const secondaryDashboardMetricCards = useMemo(
+    () => dashboardMetricCards.slice(3),
+    [dashboardMetricCards]
+  );
   const quickTransactionTemplates = useMemo<QuickTransactionTemplate[]>(() => {
     const source = ledger?.transactions ?? [];
     const map = new Map<string, QuickTransactionTemplate>();
@@ -1588,22 +1645,120 @@ export function LedgerWorkspace({
           </div>
         </div>
 
-      <section className={`grid gap-6 ${activeView === "manage" ? "lg:grid-cols-[1.25fr_0.95fr]" : ""} ${activeView === "settings" ? "hidden" : ""}`}>
-      <div className="flex flex-col gap-6">
+      <section className={`grid gap-6 ${activeView === "settings" ? "hidden" : ""}`}>
+      <div className={`flex flex-col gap-6 ${activeView === "manage" ? "hidden" : ""}`}>
         <div id="web-dashboard" />
         <div className={activeView === "dashboard" ? "" : "hidden"}>
-          <SummaryCards summary={ledger?.summary ?? emptySummary} loading={loading} />
+          <section className="rounded-[24px] border border-[var(--border)] bg-[var(--card-strong)] p-4 shadow-[var(--shadow-soft)]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[var(--muted-foreground)]">
+                  {"Core KPI"}
+                </p>
+                <h3 className="mt-1 text-lg font-semibold text-[var(--foreground)]">
+                  {"이번 달 핵심 숫자"}
+                </h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="rounded-full border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)]"
+                  onClick={() => {
+                    setActiveView("manage");
+                    setManageSection("transaction");
+                  }}
+                  type="button"
+                >
+                  {"바로 입력"}
+                </button>
+                <button
+                  className="rounded-full bg-[var(--point)] px-4 py-2 text-sm font-semibold text-white"
+                  onClick={() => setActiveView("transactions")}
+                  type="button"
+                >
+                  {"거래 검토로 이동"}
+                </button>
+              </div>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {primaryDashboardMetricCards.map((item) => {
+                const toneToken = kpiToneTokens[item.tone];
+                return (
+                  <article
+                    key={`dashboard-metric-${item.label}`}
+                    className="rounded-2xl border px-4 py-4"
+                    style={{
+                      borderColor: toneToken.border,
+                      backgroundColor: toneToken.surface
+                    }}
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted-foreground)]">
+                      {item.label}
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold" style={{ color: toneToken.text }}>
+                      {item.value}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--muted-foreground)]">{item.helper}</p>
+                  </article>
+                );
+              })}
+            </div>
+            {secondaryDashboardMetricCards.length ? (
+              <div className="mt-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-[var(--muted-foreground)]">
+                    {"보조 지표"}
+                  </p>
+                  <button
+                    className="rounded-full border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--foreground)]"
+                    onClick={() => setShowExtendedKpis((prev) => !prev)}
+                    type="button"
+                  >
+                    {showExtendedKpis ? "보조 지표 숨기기" : "보조 지표 보기"}
+                  </button>
+                </div>
+                {showExtendedKpis ? (
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {secondaryDashboardMetricCards.map((item) => {
+                      const toneToken = kpiToneTokens[item.tone];
+                      return (
+                        <article
+                          key={`dashboard-secondary-${item.label}`}
+                          className="rounded-xl border px-3 py-3"
+                          style={{
+                            borderColor: toneToken.border,
+                            backgroundColor: toneToken.surface
+                          }}
+                        >
+                          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted-foreground)]">
+                            {item.label}
+                          </p>
+                          <p className="mt-1 text-base font-semibold" style={{ color: toneToken.text }}>
+                            {item.value}
+                          </p>
+                          <p className="mt-1 text-xs text-[var(--muted-foreground)]">{item.helper}</p>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-[var(--muted-foreground)]">
+                    {"핵심 3개 지표에 집중하고, 필요할 때만 예산 위험/집중도를 확인하세요."}
+                  </p>
+                )}
+              </div>
+            ) : null}
+          </section>
           <div className="mt-4 grid gap-4 xl:grid-cols-2">
             <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] p-4 shadow-[var(--shadow-soft)]">
               <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[var(--muted-foreground)]">
                 {"Monthly Insight"}
               </p>
               <h3 className="mt-2 text-base font-semibold text-[var(--foreground)]">
-                {"예산 초과 카테고리 Top 3"}
+                {monthlyInsightCopy.budgetOverrunTitle}
               </h3>
               {!budgetInsightItems.length ? (
                 <p className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-3 text-sm text-[var(--muted-foreground)]">
-                  {"이번 달 예산 초과 카테고리가 없습니다. 좋은 흐름이에요."}
+                  {monthlyInsightCopy.budgetOverrunEmpty}
                 </p>
               ) : (
                 <div className="mt-3 flex flex-col gap-2">
@@ -1624,11 +1779,11 @@ export function LedgerWorkspace({
                 {"Spending Focus"}
               </p>
               <h3 className="mt-2 text-base font-semibold text-[var(--foreground)]">
-                {"지출 비중 상위 카테고리"}
+                {monthlyInsightCopy.topExpenseTitle}
               </h3>
               {!topExpenseCategoryItems.length ? (
                 <p className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-3 text-sm text-[var(--muted-foreground)]">
-                  {"지출 데이터가 쌓이면 핵심 카테고리 분석이 표시됩니다."}
+                  {monthlyInsightCopy.topExpenseEmpty}
                 </p>
               ) : (
                 <div className="mt-3 flex flex-col gap-2">
@@ -2300,7 +2455,7 @@ export function LedgerWorkspace({
         </section>
       </div>
 
-      <div className={`flex flex-col gap-6 ${activeView === "manage" ? "" : "hidden"}`} id="web-manage">
+      <div className={`flex w-full flex-col gap-6 ${activeView === "manage" ? "" : "hidden"}`} id="web-manage">
         {loading ? (
           <p className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 text-sm text-[var(--muted-foreground)]">
             {"관리 데이터를 불러오는 중입니다."}
@@ -2313,16 +2468,16 @@ export function LedgerWorkspace({
           </p>
         ) : null}
 
-        <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <aside className="h-fit rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] p-3 lg:sticky lg:top-6">
+        <div className="grid gap-3 xl:grid-cols-[220px_minmax(0,1fr)] xl:gap-4">
+          <aside className="h-fit rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] p-3 xl:sticky xl:top-6">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">
               {"관리 메뉴"}
             </p>
-            <div className="mt-3 flex flex-col gap-2">
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1 xl:flex-col xl:overflow-visible xl:pb-0">
               {manageSections.map((item) => (
                 <button
                   key={`manage-aside-${item.key}`}
-                  className={`rounded-xl px-3 py-2 text-left text-sm transition ${
+                  className={`min-w-[148px] shrink-0 rounded-xl px-3 py-2 text-left text-sm transition xl:min-w-0 xl:w-full ${
                     manageSection === item.key
                       ? "bg-[color:var(--point)] text-white shadow-[0_8px_18px_rgba(21,93,73,0.2)]"
                       : "border border-[var(--border)] bg-white text-stone-700 hover:bg-stone-50"
@@ -2331,7 +2486,7 @@ export function LedgerWorkspace({
                   type="button"
                 >
                   <p className="font-semibold">{item.label}</p>
-                  <p className={`mt-0.5 text-xs ${manageSection === item.key ? "text-white/80" : "text-stone-500"}`}>
+                  <p className={`mt-0.5 hidden text-xs xl:block ${manageSection === item.key ? "text-white/80" : "text-stone-500"}`}>
                     {item.description}
                   </p>
                 </button>
@@ -2339,15 +2494,16 @@ export function LedgerWorkspace({
             </div>
           </aside>
 
-          <div className="flex flex-col gap-6">
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] px-4 py-3 text-sm text-stone-700">
+          <div className="flex flex-col gap-4 md:gap-5">
+            <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] px-3 py-2.5 text-sm text-stone-700 sm:px-4 sm:py-3">
               <span className="font-semibold">{manageSectionMeta.label}</span>
               {` · ${manageSectionMeta.description}`}
             </div>
 
         <div className={manageSection === "transaction" ? "" : "hidden"}>
         <FormSection title="빠른 거래 입력">
-          <div className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] px-4 py-4">
+          <div className="space-y-4">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] px-4 py-4">
             <p className="text-sm font-semibold text-[var(--foreground)]">
               {"최근 사용 거래 템플릿"}
             </p>
@@ -2359,11 +2515,11 @@ export function LedgerWorkspace({
                 {"아직 템플릿으로 만들 최근 거래가 없습니다. 거래를 2~3건만 입력하면 자동 추천됩니다."}
               </p>
             ) : (
-              <div className="mt-3 grid gap-2 md:grid-cols-2">
+              <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {quickTransactionTemplates.map((template) => (
                   <button
                     key={`quick-template-${template.key}`}
-                    className="rounded-xl border border-[var(--border)] bg-white px-3 py-3 text-left transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-soft)]"
+                    className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-left transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-soft)]"
                     onClick={() => {
                       transactionForm.reset({
                         ...transactionDefaults,
@@ -2379,6 +2535,14 @@ export function LedgerWorkspace({
                     }}
                     type="button"
                   >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted-foreground)]">
+                        {"최근 템플릿"}
+                      </span>
+                      <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--muted-foreground)]">
+                        {`${template.usedCount}회`}
+                      </span>
+                    </div>
                     <p className="text-sm font-semibold text-[var(--foreground)]">
                       {template.description || (template.type === "transfer" ? "이체 템플릿" : "빠른 입력 템플릿")}
                     </p>
@@ -2395,7 +2559,7 @@ export function LedgerWorkspace({
               </div>
             )}
           </div>
-          <div className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-4">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-4">
             <p className="text-sm font-semibold text-[var(--foreground)]">
               {"추천 스타터 팩 (상위 가계부 앱 공통 구조)"}
             </p>
@@ -2474,6 +2638,7 @@ export function LedgerWorkspace({
             }}
             transactionType={transactionType}
           />
+          </div>
         </FormSection>
         </div>
 

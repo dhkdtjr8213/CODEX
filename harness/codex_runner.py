@@ -4,7 +4,9 @@ import argparse
 import json
 import os
 import pathlib
+import socket
 import textwrap
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -113,7 +115,12 @@ def resolve_provider() -> str:
 
 
 def resolve_timeout(provider: str) -> int:
-    default_timeout = 600 if provider == "openai_compatible_chat" else 120
+    if provider == "openai_compatible_chat":
+        default_timeout = 600
+    elif provider == "openai_responses":
+        default_timeout = 300
+    else:
+        default_timeout = 180
     raw = os.getenv("AGENT_TIMEOUT_SEC", str(default_timeout)).strip()
     try:
         parsed = int(raw)
@@ -122,15 +129,65 @@ def resolve_timeout(provider: str) -> int:
     return max(30, min(3600, parsed))
 
 
+def resolve_max_retries(provider: str) -> int:
+    default_retries = 2 if provider == "openai_responses" else 1
+    raw = os.getenv("AGENT_MAX_RETRIES", str(default_retries)).strip()
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return default_retries
+    return max(0, min(5, parsed))
+
+
+def resolve_retry_backoff_base() -> float:
+    raw = os.getenv("AGENT_RETRY_BACKOFF_BASE_SEC", "2").strip()
+    try:
+        parsed = float(raw)
+    except ValueError:
+        return 2.0
+    return max(0.5, min(10.0, parsed))
+
+
+def resolve_max_output_tokens(compact_mode: bool) -> int:
+    default_value = 320 if compact_mode else 0
+    raw = os.getenv("AGENT_MAX_OUTPUT_TOKENS", str(default_value)).strip()
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return default_value
+    return max(0, min(4096, parsed))
+
+
+def is_compact_mode_enabled() -> bool:
+    return os.getenv("AGENT_COMPACT_MODE", "0").strip() == "1"
+
+
+def is_retryable_http_status(status_code: int) -> bool:
+    return status_code in {408, 409, 425, 429, 500, 502, 503, 504}
+
+
+def format_retry_wait_seconds(base: float, attempt: int) -> float:
+    # exponential backoff: base, base*2, base*4 ...
+    return min(30.0, base * (2 ** attempt))
+
+
 def resolve_api_key(provider: str) -> str:
     if provider == "gemini_generate_content":
         return (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
     return (os.getenv("AGENT_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip()
 
 
-def call_openai_responses(model: str, api_key: str, prompt: str, timeout_sec: int) -> str:
+def call_openai_responses(
+    model: str,
+    api_key: str,
+    prompt: str,
+    timeout_sec: int,
+    max_output_tokens: int,
+) -> str:
     api_base = os.getenv("AGENT_API_BASE", "https://api.openai.com").rstrip("/")
     payload = {"model": model, "input": prompt}
+    if max_output_tokens > 0:
+        payload["max_output_tokens"] = max_output_tokens
     parsed = http_json_request(
         url=f"{api_base}/v1/responses",
         method="POST",
@@ -142,7 +199,13 @@ def call_openai_responses(model: str, api_key: str, prompt: str, timeout_sec: in
     return text if text else json.dumps(parsed, ensure_ascii=False, indent=2)
 
 
-def call_openai_compatible_chat(model: str, api_key: str, prompt: str, timeout_sec: int) -> str:
+def call_openai_compatible_chat(
+    model: str,
+    api_key: str,
+    prompt: str,
+    timeout_sec: int,
+    max_output_tokens: int,
+) -> str:
     api_base = os.getenv("AGENT_API_BASE", "http://127.0.0.1:11434").rstrip("/")
     payload = {
         "model": model,
@@ -152,6 +215,8 @@ def call_openai_compatible_chat(model: str, api_key: str, prompt: str, timeout_s
         ],
         "temperature": 0.2,
     }
+    if max_output_tokens > 0:
+        payload["max_tokens"] = max_output_tokens
     headers: dict[str, str] = {}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -166,7 +231,13 @@ def call_openai_compatible_chat(model: str, api_key: str, prompt: str, timeout_s
     return text if text else json.dumps(parsed, ensure_ascii=False, indent=2)
 
 
-def call_gemini_generate_content(model: str, api_key: str, prompt: str, timeout_sec: int) -> str:
+def call_gemini_generate_content(
+    model: str,
+    api_key: str,
+    prompt: str,
+    timeout_sec: int,
+    max_output_tokens: int,
+) -> str:
     base = os.getenv("GEMINI_API_BASE", "https://generativelanguage.googleapis.com").rstrip("/")
     encoded_model = urllib.parse.quote(model, safe="")
     url = f"{base}/v1beta/models/{encoded_model}:generateContent?key={urllib.parse.quote(api_key, safe='')}"
@@ -176,6 +247,8 @@ def call_gemini_generate_content(model: str, api_key: str, prompt: str, timeout_
             "temperature": 0.2,
         },
     }
+    if max_output_tokens > 0:
+        payload["generationConfig"]["maxOutputTokens"] = max_output_tokens
     parsed = http_json_request(
         url=url,
         method="POST",
@@ -193,10 +266,20 @@ def main() -> None:
     input_text = load_text(args.input)
     provider = resolve_provider()
     timeout_sec = resolve_timeout(provider)
+    max_retries = resolve_max_retries(provider)
+    backoff_base_sec = resolve_retry_backoff_base()
+    compact_mode = is_compact_mode_enabled()
+    max_output_tokens = resolve_max_output_tokens(compact_mode)
 
     model_default = "gpt-5.3-codex" if provider != "gemini_generate_content" else "gemma-3-27b-it"
     model = os.getenv("AGENT_MODEL", model_default).strip()
     api_key = resolve_api_key(provider)
+
+    compact_instruction = (
+        "- Keep each required section concise.\n"
+        "- Prefer short bullet points over long paragraphs.\n"
+        "- Keep total response length under 220 words.\n"
+    )
 
     prompt = textwrap.dedent(
         f"""
@@ -208,6 +291,12 @@ def main() -> None:
 
         # TASK_INPUT
         {input_text}
+
+        # RESPONSE_STYLE
+        {"compact" if compact_mode else "normal"}
+
+        # EXTRA_INSTRUCTIONS
+        {compact_instruction if compact_mode else "- Use normal detail level."}
         """
     ).strip()
 
@@ -225,41 +314,80 @@ def main() -> None:
         )
         return
 
-    try:
-        if provider == "openai_responses":
-            result_text = call_openai_responses(
-                model=model, api_key=api_key, prompt=prompt, timeout_sec=timeout_sec
+    for attempt in range(max_retries + 1):
+        try:
+            if provider == "openai_responses":
+                result_text = call_openai_responses(
+                    model=model,
+                    api_key=api_key,
+                    prompt=prompt,
+                    timeout_sec=timeout_sec,
+                    max_output_tokens=max_output_tokens,
+                )
+            elif provider == "openai_compatible_chat":
+                result_text = call_openai_compatible_chat(
+                    model=model,
+                    api_key=api_key,
+                    prompt=prompt,
+                    timeout_sec=timeout_sec,
+                    max_output_tokens=max_output_tokens,
+                )
+            else:
+                result_text = call_gemini_generate_content(
+                    model=model,
+                    api_key=api_key,
+                    prompt=prompt,
+                    timeout_sec=timeout_sec,
+                    max_output_tokens=max_output_tokens,
+                )
+            save_text(args.output, result_text.strip())
+            return
+        except urllib.error.HTTPError as error:
+            body = error.read().decode("utf-8", errors="replace")
+            retryable = is_retryable_http_status(error.code)
+            if attempt < max_retries and retryable:
+                wait_sec = format_retry_wait_seconds(backoff_base_sec, attempt)
+                time.sleep(wait_sec)
+                continue
+            save_text(
+                args.output,
+                fallback_result(
+                    args.role,
+                    skill_text,
+                    input_text,
+                    (
+                        f"Provider HTTPError {error.code} ({provider})"
+                        f" after {attempt + 1} attempt(s): {body[:500]}"
+                    ),
+                ),
             )
-        elif provider == "openai_compatible_chat":
-            result_text = call_openai_compatible_chat(
-                model=model, api_key=api_key, prompt=prompt, timeout_sec=timeout_sec
+            return
+        except (TimeoutError, socket.timeout, urllib.error.URLError) as error:
+            if attempt < max_retries:
+                wait_sec = format_retry_wait_seconds(backoff_base_sec, attempt)
+                time.sleep(wait_sec)
+                continue
+            save_text(
+                args.output,
+                fallback_result(
+                    args.role,
+                    skill_text,
+                    input_text,
+                    f"Provider call failed ({provider}) after {attempt + 1} attempt(s): {error}",
+                ),
             )
-        else:
-            result_text = call_gemini_generate_content(
-                model=model, api_key=api_key, prompt=prompt, timeout_sec=timeout_sec
+            return
+        except Exception as error:  # noqa: BLE001
+            save_text(
+                args.output,
+                fallback_result(
+                    args.role,
+                    skill_text,
+                    input_text,
+                    f"Provider call failed ({provider}) after {attempt + 1} attempt(s): {error}",
+                ),
             )
-        save_text(args.output, result_text.strip())
-    except urllib.error.HTTPError as error:
-        body = error.read().decode("utf-8", errors="replace")
-        save_text(
-            args.output,
-            fallback_result(
-                args.role,
-                skill_text,
-                input_text,
-                f"Provider HTTPError {error.code} ({provider}): {body[:500]}",
-            ),
-        )
-    except Exception as error:  # noqa: BLE001
-        save_text(
-            args.output,
-            fallback_result(
-                args.role,
-                skill_text,
-                input_text,
-                f"Provider call failed ({provider}): {error}",
-            ),
-        )
+            return
 
 
 if __name__ == "__main__":

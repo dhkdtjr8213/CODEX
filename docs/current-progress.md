@@ -1,6 +1,52 @@
 # 현재 진행 상황
 
-기준일: 2026-04-15
+기준일: 2026-04-20
+
+## 최신 업데이트 (2026-04-20)
+- Web 디자인 1차 개선 반영
+  - 대시보드 상단 `Core KPI` 블록 추가(핵심 숫자 4종 + 빠른 액션)
+  - 빠른 입력 `최근 템플릿` 카드 밀도 개선(3열, 사용횟수 배지)
+  - 거래 입력 시 기본 카테고리 자동 채움 로직 추가
+- Web 디자인 2차 보정 반영
+  - KPI 카드에 위험 톤(잔액 음수/예산 위험) 강조 색상 반영
+  - KPI 4번째 지표를 `예산 위험/집중도`로 교체
+  - KPI 색상 기준을 `packages/ui` 공통 토큰(`kpiToneTokens`)으로 연결
+- Mobile 디자인/기능 1차 개선 반영
+  - 홈에 `스타터 팩` 카드 추가(누락 계정/카테고리 수 안내 + 원탭 적용)
+  - 홈에 `월간 인사이트 Top 3` 카드 추가(지출 상위 카테고리)
+  - 스타터 팩 적용 중 중복 클릭 방지(`ActionButton disabled`) 반영
+- Mobile 기능 2차 반영
+  - 입력 화면에 `최근 사용 템플릿` 원탭 불러오기 추가
+  - 템플릿 카드에 거래 유형/계정/카테고리 정보 보강
+  - 길게 눌러 템플릿 고정(pin) + 고정 템플릿 우선 정렬 반영
+- 하네스 안정화 보강
+  - 역할별 실행 제한시간 도입: `HARNESS_ROLE_TIMEOUT_SEC`(기본 90초)
+  - 전체 실행 제한시간 도입: `HARNESS_FULL_TIMEOUT_MS`(기본 900000ms)
+  - timeout 발생 시 원인 메시지 명시
+  - `연속 실패 시 조기 종료` 도입: `HARNESS_MAX_CONSECUTIVE_FAILURES`(기본 3)
+  - Windows에서 timeout 시 프로세스 트리 강제 종료(`taskkill /T`)
+- `pnpm ops:pr-rehearsal`: PASS
+  - `typecheck`, `lint`, `smoke` 통과
+  - 리포트 갱신: `docs/manual-kit/pr-rehearsal-last-report.md`
+- `pnpm ops:preflight`: PASS (실운영 연결 재검증 완료)
+  - 리포트 갱신: `docs/manual-kit/preflight-last-report.md`
+  - 체크리스트 자동 갱신: `docs/deployment-checklist.md`
+- 장시간 하네스 검증(`HARNESS_QUICK_MODE=0`): 진행 시간 이슈 지속
+  - 10분/20분 실행 모두 타임아웃으로 완주 실패
+  - `work/tasks/LEDGER-20260420-094555`, `work/tasks/LEDGER-20260420-100433`에서 중간 산출물 확인
+  - 튜닝 재검증(`ROLE_TIMEOUT=45`, `FULL_TIMEOUT=720000`)도 전체 타임아웃
+  - 단, 역할별 timeout 기록 확인(`chief/deputy/planner/types` fail-fast)
+    - `work/tasks/LEDGER-20260420-130704/state.json`
+  - 개선 재검증(`ROLE_TIMEOUT=30`, `MAX_CONSECUTIVE_FAILURES=1`) 결과
+    - `state=failed`로 조기 종료 확인
+    - reason: `Stopped early due to consecutive role failures` (last_role: chief)
+  - 프로세스 트리 강제 종료 반영 후 재검증에서도 동일하게 조기 종료 확인
+    - `LEDGER-20260420-142436`: state failed / reason 정상 출력 / 잔여 프로세스 없음
+- PR 게이트 상태
+  - PR #1은 여전히 `draft/open`, 리뷰 승인 없음
+  - Ready 전환 API 재시도 실패: GitHub 앱 토큰 만료(`token_expired`)
+- 레퍼런스 기반 기획 산출물 추가
+  - `docs/reference-based-feature-screen-blueprint-2026-04-20.md`
 
 ## 완료
 - 웹 IA 및 달력/거래검토 UX 개선

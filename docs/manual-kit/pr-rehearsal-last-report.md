@@ -1,9 +1,9 @@
 # PR Rehearsal Last Report
 
-- generatedAt: 2026-04-15T06:58:30.962Z
+- generatedAt: 2026-04-21T02:28:39.532Z
 - currentBranch: feat/multi-agent-gemma4-orchestration
 - branchIsMain: no
-- changedFilesCount: 0
+- changedFilesCount: 19
 - ciLikeChecks: PASS
 
 ## Checks
@@ -19,5 +19,23 @@
 
 ## Git Status (short)
 ```
-(clean)
+M AGENTS.md
+ M SESSION_LOG.md
+ M apps/mobile/src/mobile-ledger-app.tsx
+ M apps/mobile/src/screens.tsx
+ M apps/mobile/src/ui.tsx
+ M apps/web/components/auth-panel.tsx
+ M apps/web/components/ledger-sections.tsx
+ M apps/web/components/ledger-workspace.tsx
+ M docs/current-progress.md
+ M docs/deployment-checklist.md
+ M docs/manual-kit/pr-rehearsal-last-report.md
+ M docs/manual-kit/preflight-last-report.md
+ M harness/codex_runner.py
+ M harness/orchestrator.py
+ M packages/supabase/src/auth.ts
+ M packages/ui/src/index.ts
+ M scripts/ops/check-harness-runner.mjs
+?? docs/reference-based-feature-screen-blueprint-2026-04-20.md
+?? scripts/ops/tmp-mark-pr-ready.mjs
 ```

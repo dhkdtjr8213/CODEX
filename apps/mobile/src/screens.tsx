@@ -19,7 +19,14 @@ import type {
   RecurringTransactionFormValues,
   TransactionFormValues
 } from "@household/types";
-import { colors, formatCurrency, getTodayInputValue, sanitizeAmountInput } from "@household/ui";
+import {
+  classifyRecurringFailureReason,
+  colors,
+  formatCurrency,
+  getTodayInputValue,
+  monthlyInsightCopy,
+  sanitizeAmountInput
+} from "@household/ui";
 import { styles } from "./styles";
 import {
   ActionButton,
@@ -31,6 +38,19 @@ import {
 } from "./ui";
 
 type RecurringExecutionLogItem = LedgerSnapshot["recurringExecutionLogs"][number];
+type QuickTransactionTemplate = {
+  key: string;
+  type: TransactionFormValues["type"];
+  amount: number;
+  accountId: string;
+  accountName: string;
+  categoryId: string | null;
+  categoryName: string;
+  transferAccountId: string | null;
+  transferAccountName: string;
+  description: string;
+  usedCount: number;
+};
 
 const quickAmountPresets = [
   { label: "+1\uB9CC", amount: 10_000 },
@@ -75,6 +95,10 @@ function formatExecutionDateTime(value: string) {
 }
 
 function getExecutionLogDetail(item: RecurringExecutionLogItem) {
+  if (typeof item.errorMessage === "string" && item.errorMessage.trim()) {
+    return { label: "오류", value: item.errorMessage.trim() };
+  }
+
   const extra = item as Partial<{
     message: string;
     error: string;
@@ -250,6 +274,31 @@ const recurringExecutionLogStyles = StyleSheet.create({
   statusHelper: {
     fontSize: 11,
     fontWeight: "600"
+  },
+  failureTypeBadge: {
+    marginTop: 4,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    fontSize: 10,
+    fontWeight: "700",
+    overflow: "hidden"
+  },
+  failureTypePermission: {
+    color: "#a16207",
+    backgroundColor: "#fff7ed"
+  },
+  failureTypeNetwork: {
+    color: "#0369a1",
+    backgroundColor: "#f0f9ff"
+  },
+  failureTypeInput: {
+    color: "#7c3aed",
+    backgroundColor: "#f5f3ff"
+  },
+  failureTypeOther: {
+    color: "#57534e",
+    backgroundColor: "#f5f5f4"
   }
 });
 
@@ -286,13 +335,20 @@ export function HomeScreen(props: {
   summary: MonthlySummary;
   transactions: LedgerTransactionItem[];
   budgetProgress: LedgerSnapshot["monthlyStats"]["budgetProgress"];
+  topExpenseCategories: LedgerSnapshot["monthlyStats"]["categoryBreakdown"];
   recurringTransactions: LedgerSnapshot["recurringTransactions"];
   recurringExecutionLogs: LedgerSnapshot["recurringExecutionLogs"];
+  missingStarterAccountsCount: number;
+  missingStarterCategoriesCount: number;
+  starterPackApplying: boolean;
+  onApplyStarterPack: () => void;
+  onGoManage: () => void;
   onGoEntry: () => void;
   onGoList: () => void;
   onEditTransaction: (item: LedgerTransactionItem) => void;
 }) {
   const [selectedExecutionLog, setSelectedExecutionLog] = React.useState<RecurringExecutionLogItem | null>(null);
+  const [showExtendedHomeSections, setShowExtendedHomeSections] = React.useState(false);
   const recentRecurringExecutionLogs = props.recurringExecutionLogs.slice(0, 3);
   const recentRecurringExecutionCounts = getRecentRecurringExecutionCounts(
     props.recurringExecutionLogs
@@ -300,6 +356,8 @@ export function HomeScreen(props: {
   const totalRecurringExecutionCounts = getTotalRecurringExecutionCounts(
     props.recurringExecutionLogs
   );
+  const hasStarterPackGaps =
+    props.missingStarterAccountsCount + props.missingStarterCategoriesCount > 0;
 
   return (
     <>
@@ -308,6 +366,8 @@ export function HomeScreen(props: {
         <SummaryCard label="\uC774\uBC88 \uB2EC \uC9C0\uCD9C" value={props.summary.expense} />
       </View>
       <View style={styles.card}>
+        <Text style={styles.sectionTitle}>{"핵심 정보"}</Text>
+        <Text style={styles.helperText}>{"이번 달 돈 흐름을 먼저 확인하고 바로 입력으로 이동하세요."}</Text>
         <Text style={styles.cardLabel}>{"\uC774\uBC88 \uB2EC \uC794\uC561"}</Text>
         <Text style={styles.netValue}>{formatCurrency(props.summary.balance)}</Text>
         <View style={styles.row}>
@@ -322,6 +382,49 @@ export function HomeScreen(props: {
             variant="secondary"
           />
         </View>
+      </View>
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>{"스타터 팩"}</Text>
+        <Text style={styles.helperText}>
+          {`초기 설정을 빠르게 마치려면 계정 ${props.missingStarterAccountsCount}개, 카테고리 ${props.missingStarterCategoriesCount}개를 한 번에 추가하세요.`}
+        </Text>
+        <View style={styles.row}>
+          <ActionButton
+            label={
+              props.starterPackApplying
+                ? "적용 중..."
+                : !hasStarterPackGaps
+                  ? "이미 적용 완료"
+                  : "스타터 팩 적용"
+            }
+            onPress={props.onApplyStarterPack}
+            variant="primary"
+            disabled={
+              props.starterPackApplying ||
+              !hasStarterPackGaps
+            }
+          />
+          <ActionButton
+            label="관리 화면 열기"
+            onPress={props.onGoManage}
+            variant="secondary"
+          />
+        </View>
+      </View>
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>{monthlyInsightCopy.sectionTitle}</Text>
+        {!props.topExpenseCategories.length ? (
+          <EmptyState text={monthlyInsightCopy.topExpenseEmpty} />
+        ) : null}
+        {props.topExpenseCategories.slice(0, 3).map((item) => (
+          <View key={item.categoryId} style={styles.listItem}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.listTitle}>{item.categoryName}</Text>
+              <Text style={styles.listSubTitle}>{`${item.percentage.toFixed(1)}%`}</Text>
+            </View>
+            <Text style={styles.listAmount}>{formatCurrency(item.amount)}</Text>
+          </View>
+        ))}
       </View>
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>{"\uCD5C\uADFC \uAC70\uB798\uB0B4\uC5ED"}</Text>
@@ -340,6 +443,19 @@ export function HomeScreen(props: {
           />
         ))}
       </View>
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>{"운영 상세"}</Text>
+        <Text style={styles.helperText}>
+          {"예산 진행률과 반복 실행 로그는 필요할 때만 펼쳐서 확인하세요."}
+        </Text>
+        <ActionButton
+          label={showExtendedHomeSections ? "상세 접기" : "상세 보기"}
+          onPress={() => setShowExtendedHomeSections((prev) => !prev)}
+          variant="secondary"
+        />
+      </View>
+      {showExtendedHomeSections ? (
+        <>
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>{"\uC608\uC0B0 \uC694\uC57D"}</Text>
         {!props.budgetProgress.length ? <EmptyState text="\uC124\uC815\uB41C \uC608\uC0B0\uC774 \uC5C6\uC2B5\uB2C8\uB2E4." /> : null}
@@ -401,6 +517,10 @@ export function HomeScreen(props: {
         {recentRecurringExecutionLogs.map((item) => {
           const status = getRecurringExecutionStatus(item);
           const detail = getExecutionLogDetail(item);
+          const failureKind =
+            status.tone === "failure"
+              ? classifyRecurringFailureReason(detail?.value)
+              : null;
 
           return (
             <Pressable
@@ -459,6 +579,22 @@ export function HomeScreen(props: {
                 >
                   {status.helper}
                 </Text>
+                {failureKind ? (
+                  <Text
+                    style={[
+                      recurringExecutionLogStyles.failureTypeBadge,
+                      failureKind.kind === "permission"
+                        ? recurringExecutionLogStyles.failureTypePermission
+                        : failureKind.kind === "network"
+                          ? recurringExecutionLogStyles.failureTypeNetwork
+                          : failureKind.kind === "input"
+                            ? recurringExecutionLogStyles.failureTypeInput
+                            : recurringExecutionLogStyles.failureTypeOther
+                    ]}
+                  >
+                    {failureKind.label}
+                  </Text>
+                ) : null}
               </View>
             </Pressable>
           );
@@ -507,6 +643,12 @@ export function HomeScreen(props: {
                     {"사유: "}
                     {getExecutionLogDetail(selectedExecutionLog)?.value ?? "사유 없음"}
                   </Text>
+                  <Text style={{ fontSize: 13, color: colors.foreground }}>
+                    {"유형: "}
+                    {getRecurringExecutionStatus(selectedExecutionLog).tone === "failure"
+                      ? classifyRecurringFailureReason(getExecutionLogDetail(selectedExecutionLog)?.value).label
+                      : "-"}
+                  </Text>
                 </>
               ) : null}
               <ActionButton
@@ -517,6 +659,7 @@ export function HomeScreen(props: {
                   }
 
                   const reason = getExecutionLogDetail(selectedExecutionLog)?.value ?? "사유 없음";
+                  const failureKind = classifyRecurringFailureReason(reason).label;
                   void Share.share({
                     message: [
                       "반복거래 실행 상세",
@@ -524,6 +667,7 @@ export function HomeScreen(props: {
                       `예약: ${formatExecutionDateTime(selectedExecutionLog.scheduledFor)}`,
                       `실행: ${formatExecutionDateTime(selectedExecutionLog.executedAt)}`,
                       `상태: ${getRecurringExecutionStatus(selectedExecutionLog).label}`,
+                      `유형: ${failureKind}`,
                       `사유: ${reason}`
                     ].join("\n")
                   });
@@ -539,6 +683,8 @@ export function HomeScreen(props: {
           </Pressable>
         </Modal>
       </View>
+      </>
+      ) : null}
     </>
   );
 }
@@ -546,6 +692,10 @@ export function HomeScreen(props: {
 export function EntryScreen(props: {
   accounts: LedgerSnapshot["accounts"];
   categories: LedgerSnapshot["categories"];
+  quickTransactionTemplates: QuickTransactionTemplate[];
+  pinnedTemplateKeys: string[];
+  onToggleTemplatePin: (templateKey: string) => void;
+  onApplyQuickTemplate: (template: QuickTransactionTemplate) => void;
   form: UseFormReturn<TransactionFormValues>;
   transactionType: TransactionFormValues["type"];
   onSubmit: (values: TransactionFormValues) => Promise<void>;
@@ -553,6 +703,55 @@ export function EntryScreen(props: {
   return (
     <View style={styles.card}>
       <Text style={styles.sectionTitle}>{"\uAC70\uB798 \uC785\uB825"}</Text>
+      <View style={styles.fieldGroup}>
+        <Text style={styles.fieldLabel}>{"최근 사용 템플릿"}</Text>
+        {!props.quickTransactionTemplates.length ? (
+          <EmptyState text="아직 데이터가 없어요. 거래를 2~3건 입력하면 템플릿이 자동 추천됩니다." />
+        ) : (
+          <View style={styles.quickChipRow}>
+            {props.quickTransactionTemplates.map((template) => (
+              <View key={`mobile-quick-template-${template.key}`} style={{ minWidth: 130, flex: 1 }}>
+                <Pressable
+                  onLongPress={() => props.onToggleTemplatePin(template.key)}
+                  onPress={() => props.onApplyQuickTemplate(template)}
+                  style={[
+                    styles.quickChip,
+                    {
+                      borderRadius: 14,
+                      paddingHorizontal: 10,
+                      paddingVertical: 10,
+                      borderColor: props.pinnedTemplateKeys.includes(template.key) ? colors.accent : colors.border,
+                      backgroundColor: props.pinnedTemplateKeys.includes(template.key) ? "#eef8f3" : "#ffffff"
+                    }
+                  ]}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                    <Text style={[styles.quickChipLabel, { fontSize: 11, fontWeight: "700", flex: 1 }]}>
+                      {template.description || (template.type === "transfer" ? "이체 템플릿" : "빠른 템플릿")}
+                    </Text>
+                    <Text style={[styles.quickChipLabel, { fontSize: 10, color: props.pinnedTemplateKeys.includes(template.key) ? colors.accent : colors.muted }]}>
+                      {props.pinnedTemplateKeys.includes(template.key) ? "고정됨" : "길게 눌러 고정"}
+                    </Text>
+                  </View>
+                  <Text style={[styles.quickChipLabel, { marginTop: 4, fontSize: 11 }]}>
+                    {formatCurrency(template.amount)}
+                  </Text>
+                  <Text style={[styles.quickChipLabel, { marginTop: 3, fontSize: 10, opacity: 0.9 }]}>
+                    {`${template.type === "income" ? "수입" : template.type === "expense" ? "지출" : "이체"} · ${template.accountName}${
+                      template.type === "transfer" && template.transferAccountName
+                        ? ` → ${template.transferAccountName}`
+                        : ""
+                    }${template.categoryName ? ` · ${template.categoryName}` : ""}`}
+                  </Text>
+                  <Text style={[styles.quickChipLabel, { marginTop: 2, fontSize: 10, opacity: 0.8 }]}>
+                    {`${template.usedCount}회`}
+                  </Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
       <Controller
         control={props.form.control}
         name="type"

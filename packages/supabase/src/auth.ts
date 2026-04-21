@@ -121,7 +121,7 @@ export function toAuthSessionSnapshot(
 export async function fetchLedgerOverviewCounts(
   client: SupabaseClient<Database>
 ): Promise<LedgerOverviewCounts> {
-  const [{ count: accounts }, { count: categories }, { count: transactions }, { count: budgets }] =
+  const [accountsResult, categoriesResult, transactionsResult, budgetsResult] =
     await Promise.all([
       client.from("accounts").select("*", { count: "exact", head: true }),
       client.from("categories").select("*", { count: "exact", head: true }),
@@ -132,11 +132,33 @@ export async function fetchLedgerOverviewCounts(
       client.from("budgets").select("*", { count: "exact", head: true })
     ]);
 
+  const failures = [
+    ["accounts", accountsResult.error],
+    ["categories", categoriesResult.error],
+    ["transactions", transactionsResult.error],
+    ["budgets", budgetsResult.error]
+  ].filter(([, error]) => Boolean(error));
+
+  if (failures.length > 0) {
+    const detail = failures
+      .map(([name, error]) => {
+        if (!error) {
+          return `${name}: unknown error`;
+        }
+        if (typeof error === "string") {
+          return `${name}: ${error}`;
+        }
+        return `${name}: ${error.message ?? "unknown error"}`;
+      })
+      .join(", ");
+    throw new Error(`요약 통계를 불러오지 못했습니다. (${detail})`);
+  }
+
   return {
-    accounts: accounts ?? 0,
-    categories: categories ?? 0,
-    transactions: transactions ?? 0,
-    budgets: budgets ?? 0
+    accounts: accountsResult.count ?? 0,
+    categories: categoriesResult.count ?? 0,
+    transactions: transactionsResult.count ?? 0,
+    budgets: budgetsResult.count ?? 0
   };
 }
 

@@ -39,6 +39,37 @@ const hasGeminiApiKey = Boolean(
 const allowFallback = (process.env.HARNESS_ALLOW_FALLBACK || "").trim() === "1";
 const quickMode = (process.env.HARNESS_QUICK_MODE || "1").trim() !== "0";
 const goal = process.env.HARNESS_GOAL?.trim() || "harness runner connectivity check";
+const compactMode = (process.env.AGENT_COMPACT_MODE || "1").trim();
+const maxOutputTokensForHarness = (() => {
+  const explicit = (process.env.HARNESS_MAX_OUTPUT_TOKENS || "").trim();
+  if (explicit) return explicit;
+  const existing = (process.env.AGENT_MAX_OUTPUT_TOKENS || "").trim();
+  if (existing) return existing;
+  if (provider === "openai_compatible_chat" && compactMode === "1") {
+    return "32";
+  }
+  return "";
+})();
+const disableParallelForHarness = (() => {
+  const explicit = (process.env.HARNESS_DISABLE_PARALLEL || "").trim();
+  if (explicit) return explicit;
+  if (provider === "openai_compatible_chat") {
+    return "1";
+  }
+  return "0";
+})();
+const artifactCharLimitForHarness = (() => {
+  const explicit = (process.env.HARNESS_ARTIFACT_CHAR_LIMIT || "").trim();
+  if (explicit) return explicit;
+  if (provider === "openai_compatible_chat") {
+    return "480";
+  }
+  return "";
+})();
+const fullModeTimeoutMsRaw = (process.env.HARNESS_FULL_TIMEOUT_MS || "900000").trim();
+const fullModeTimeoutMs = Number.isFinite(Number(fullModeTimeoutMsRaw))
+  ? Math.max(60_000, Math.min(3_600_000, Number(fullModeTimeoutMsRaw)))
+  : 900_000;
 
 const providerHasCredential = (() => {
   if (provider === "gemini_generate_content") {
@@ -57,6 +88,75 @@ if (!pythonBin) {
 }
 
 const runnerCmd = `${pythonBin} harness/codex_runner.py --role {role} --skill {skill_file} --input {input_file} --output {output_file}`;
+
+function warmupRunner() {
+  const tempDir = mkdtempSync(resolve(tmpdir(), "harness-warmup-"));
+  const skillFile = resolve(tempDir, "skill.md");
+  const inputFile = resolve(tempDir, "input.md");
+  const outputFile = resolve(tempDir, "output.md");
+
+  writeFileSync(
+    skillFile,
+    `---
+name: warmup-check
+description: warmup call before full orchestration
+---
+
+Return exactly:
+1. summary
+2. note`,
+    "utf8"
+  );
+  writeFileSync(
+    inputFile,
+    "1. summary\nwarmup\n2. note\nok",
+    "utf8"
+  );
+
+  const warmup = spawnSync(
+    pythonBin,
+    [
+      "harness/codex_runner.py",
+      "--role",
+      "warmup-check",
+      "--skill",
+      skillFile,
+      "--input",
+      inputFile,
+      "--output",
+      outputFile,
+    ],
+    {
+      shell: false,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        AGENT_COMPACT_MODE: compactMode,
+        ...(maxOutputTokensForHarness
+          ? { AGENT_MAX_OUTPUT_TOKENS: maxOutputTokensForHarness }
+          : {}),
+        HARNESS_DISABLE_PARALLEL: disableParallelForHarness,
+      },
+    }
+  );
+
+  const output = existsSync(outputFile) ? readFileSync(outputFile, "utf8") : "";
+  const fallback = output.includes("fallback response");
+
+  rmSync(tempDir, { recursive: true, force: true });
+
+  if (warmup.error) {
+    return { ok: false, note: warmup.error.message, fallback };
+  }
+  if (warmup.status !== 0) {
+    return {
+      ok: false,
+      note: (warmup.stderr || warmup.stdout || "unknown warmup failure").trim(),
+      fallback,
+    };
+  }
+  return { ok: true, note: "ok", fallback };
+}
 
 if (quickMode) {
   const tempDir = mkdtempSync(resolve(tmpdir(), "harness-check-"));
@@ -99,6 +199,10 @@ Return exactly:
       encoding: "utf8",
       env: {
         ...process.env,
+        AGENT_COMPACT_MODE: compactMode,
+        ...(maxOutputTokensForHarness
+          ? { AGENT_MAX_OUTPUT_TOKENS: maxOutputTokensForHarness }
+          : {}),
       },
     }
   );
@@ -142,20 +246,47 @@ Return exactly:
   process.exit(0);
 }
 
+const warmup = warmupRunner();
+if (!warmup.ok) {
+  console.log("[warn] Warmup call did not complete cleanly. Continuing full check.");
+  console.log(`- warmup_note: ${warmup.note}`);
+} else if (warmup.fallback) {
+  console.log("[warn] Warmup produced fallback output. Continuing full check.");
+} else {
+  console.log("[ok] Warmup call completed.");
+}
+
 const runResult = spawnSync(
   pythonBin,
   ["harness/orchestrator.py", goal],
   {
     env: {
       ...process.env,
+      AGENT_COMPACT_MODE: compactMode,
+      ...(maxOutputTokensForHarness
+        ? { AGENT_MAX_OUTPUT_TOKENS: maxOutputTokensForHarness }
+        : {}),
+      HARNESS_DISABLE_PARALLEL: disableParallelForHarness,
+      ...(artifactCharLimitForHarness
+        ? { HARNESS_ARTIFACT_CHAR_LIMIT: artifactCharLimitForHarness }
+        : {}),
       AGENT_RUNNER_CMD: runnerCmd
     },
     shell: false,
-    encoding: "utf8"
+    encoding: "utf8",
+    timeout: fullModeTimeoutMs,
   }
 );
 
 if (runResult.error) {
+  if (runResult.error.code === "ETIMEDOUT") {
+    console.error("[fail] Orchestrator timed out.");
+    console.error(`- timeout_ms: ${fullModeTimeoutMs}`);
+    console.error(
+      "- hint: increase HARNESS_FULL_TIMEOUT_MS or lower HARNESS_ROLE_TIMEOUT_SEC to fail fast per role."
+    );
+    process.exit(1);
+  }
   console.error("[fail] Failed to execute orchestrator.");
   console.error(runResult.error.message);
   process.exit(1);
@@ -184,6 +315,16 @@ if (!existsSync(statePath)) {
 }
 
 const state = JSON.parse(readFileSync(statePath, "utf8"));
+if (state.status !== "completed") {
+  console.error("[fail] Harness task did not complete.");
+  console.error(`- state: ${state.status}`);
+  const orchestratorResult = state.results?.orchestrator;
+  if (orchestratorResult?.output_text) {
+    console.error("- reason:");
+    console.error(orchestratorResult.output_text);
+  }
+  process.exit(1);
+}
 const outputs = Object.values(state.artifacts ?? {}).filter((v) => typeof v === "string");
 const fallbackCount = outputs.filter((text) => text.includes("fallback response")).length;
 

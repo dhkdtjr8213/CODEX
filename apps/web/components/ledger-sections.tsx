@@ -19,7 +19,12 @@ import {
   TRANSACTION_TYPE_OPTIONS,
   WEEK_START_OPTIONS
 } from "@household/config";
-import { formatCurrency, sanitizeAmountInput } from "@household/ui";
+import {
+  classifyRecurringFailureReason,
+  formatCurrency,
+  sanitizeAmountInput,
+  type RecurringFailureKind
+} from "@household/ui";
 
 const recurringFailureFilterStorageKey = "web-recurring-failure-filters-v1";
 
@@ -59,6 +64,13 @@ function getExecutionFailureReason(item: RecurringExecutionLogItem) {
     normalizeExecutionFailureReason(item.errorMessage)
   );
 }
+
+const recurringFailureBadgeClassName: Record<RecurringFailureKind, string> = {
+  permission: "border-amber-200 bg-amber-50 text-amber-700",
+  network: "border-sky-200 bg-sky-50 text-sky-700",
+  input: "border-violet-200 bg-violet-50 text-violet-700",
+  other: "border-stone-200 bg-stone-100 text-stone-700"
+};
 
 function summarizeRecurringExecutionLogs(items: RecurringExecutionLogItem[]) {
   const sevenDaysAgo = dayjs().subtract(7, "day").valueOf();
@@ -1051,6 +1063,7 @@ export function RecurringExecutionPanel({
                   ) : null}
                   {recentFailureLogItems.map((item) => {
                     const reason = getExecutionFailureReason(item) ?? "사유 없음";
+                    const failureKind = classifyRecurringFailureReason(reason);
 
                     return (
                       <div
@@ -1062,6 +1075,11 @@ export function RecurringExecutionPanel({
                         </p>
                         <p className="mt-1 text-stone-600">
                           <span className="font-medium text-stone-700">{"사유: "}</span>
+                          <span
+                            className={`mr-2 inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${recurringFailureBadgeClassName[failureKind.kind]}`}
+                          >
+                            {failureKind.label}
+                          </span>
                           {reason}
                         </p>
                       </div>
@@ -1076,6 +1094,7 @@ export function RecurringExecutionPanel({
                         <div className="flex flex-col gap-3">
                           {filteredFailureLogItems.slice(5).map((item) => {
                             const reason = getExecutionFailureReason(item) ?? "사유 없음";
+                            const failureKind = classifyRecurringFailureReason(reason);
 
                             return (
                               <div
@@ -1087,6 +1106,11 @@ export function RecurringExecutionPanel({
                                 </p>
                                 <p className="mt-1 text-stone-600">
                                   <span className="font-medium text-stone-700">{"사유: "}</span>
+                                  <span
+                                    className={`mr-2 inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${recurringFailureBadgeClassName[failureKind.kind]}`}
+                                  >
+                                    {failureKind.label}
+                                  </span>
                                   {reason}
                                 </p>
                               </div>
@@ -1123,8 +1147,12 @@ export function RecurringExecutionPanel({
 
       {!loading && !error && hasItems ? (
         <div className="mt-4 flex flex-col gap-3">
-          {items.map((item) => (
-            <article key={item.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] shadow-[var(--shadow-soft)] p-4">
+          {items.map((item) => {
+            const failureReason = getExecutionFailureReason(item);
+            const failureKind = classifyRecurringFailureReason(failureReason);
+
+            return (
+              <article key={item.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] shadow-[var(--shadow-soft)] p-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="font-medium">
@@ -1177,14 +1205,24 @@ export function RecurringExecutionPanel({
                 <div className="rounded-2xl bg-stone-50 px-4 py-3 sm:col-span-3">
                   <dt className="text-xs text-stone-500">{"실패 원인"}</dt>
                   <dd className="mt-1 text-sm font-medium text-stone-800">
-                    {item.status === "failed"
-                      ? getExecutionFailureReason(item) ?? "알 수 없는 오류"
-                      : "-"}
+                    {item.status === "failed" ? (
+                      <span className="inline-flex flex-wrap items-center gap-2">
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${recurringFailureBadgeClassName[failureKind.kind]}`}
+                        >
+                          {failureKind.label}
+                        </span>
+                        <span>{failureReason ?? "알 수 없는 오류"}</span>
+                      </span>
+                    ) : (
+                      "-"
+                    )}
                   </dd>
                 </div>
               </dl>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       ) : null}
     </section>
