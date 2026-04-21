@@ -6,11 +6,13 @@ import { styles } from "./styles";
 export function ActionButton({
   label,
   onPress,
-  variant
+  variant,
+  disabled = false
 }: {
   label: string;
   onPress: () => void;
   variant: "primary" | "secondary" | "ghost" | "ghostSmall" | "dangerSmall";
+  disabled?: boolean;
 }) {
   const backgroundColor =
     variant === "primary" ? "#1f1a17" : variant === "dangerSmall" ? "#fff5f5" : "#ffffff";
@@ -20,7 +22,15 @@ export function ActionButton({
     variant === "primary" ? "#ffffff" : variant === "dangerSmall" ? "#c44536" : "#1f1a17";
 
   return (
-    <Pressable style={[styles.buttonBase, { backgroundColor, borderColor, borderWidth: 1 }]} onPress={onPress}>
+    <Pressable
+      disabled={disabled}
+      style={[
+        styles.buttonBase,
+        { backgroundColor, borderColor, borderWidth: 1 },
+        disabled ? { opacity: 0.55 } : null
+      ]}
+      onPress={onPress}
+    >
       <Text style={{ color: textColor, fontWeight: "700" }}>{label}</Text>
     </Pressable>
   );

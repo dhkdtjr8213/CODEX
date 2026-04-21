@@ -14,6 +14,7 @@
 ## 사전 준비
 - `supabase/migrations/0001_mvp_auth_and_ledger.sql` 적용
 - `supabase/migrations/0002_recurring_execution_batch.sql` 적용
+- `supabase/migrations/0003_recurring_execution_failure_details.sql` 적용
 - `supabase/functions/run-recurring-batch/index.ts` 배포
 - [docs/deployment-checklist.md](./deployment-checklist.md)에서 redirect URL과 시크릿 설정을 먼저 맞춘다.
 
@@ -28,6 +29,8 @@
 - `SUPABASE_URL` = `https://<project-ref>.supabase.co`
 - `SUPABASE_SERVICE_ROLE_KEY` = service role key
 - `CRON_SECRET` = 외부 스케줄러가 보낼 공유 비밀값
+- `SUPABASE_ACCESS_TOKEN` = Supabase CLI 로그인 토큰(배포 자동화 시 필요)
+- `SUPABASE_PROJECT_REF` = Supabase 프로젝트 ref (예: `abcd1234efgh5678`)
 
 ### GitHub Actions cron
 - `SUPABASE_PROJECT_URL` = `https://<project-ref>.supabase.co`
@@ -39,6 +42,12 @@ supabase functions deploy run-recurring-batch --no-verify-jwt
 supabase secrets set SUPABASE_URL="https://<project-ref>.supabase.co"
 supabase secrets set SUPABASE_SERVICE_ROLE_KEY="<service-role-key>"
 supabase secrets set CRON_SECRET="<long-random-string>"
+```
+
+프로젝트 스크립트로 자동 배포하려면:
+
+```bash
+pnpm ops:deploy-recurring-function
 ```
 
 ## 수동 호출 예시
@@ -61,6 +70,14 @@ curl -X POST "https://<project-ref>.supabase.co/functions/v1/run-recurring-batch
 ```bash
 pnpm ops:check-recurring-batch
 ```
+
+실제 실행 호출까지 확인하려면:
+
+```bash
+pnpm ops:check-recurring-batch --execute
+```
+
+추가로 `SUPABASE_SERVICE_ROLE_KEY`가 설정되어 있으면 최근 실행 로그의 성공/실패 및 실패 사유 상위 요약을 함께 출력한다.
 
 ## 스케줄 연결
 - GitHub Actions: `.github/workflows/recurring-batch-cron.yml`

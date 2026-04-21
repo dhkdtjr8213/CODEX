@@ -19,7 +19,12 @@ import {
   TRANSACTION_TYPE_OPTIONS,
   WEEK_START_OPTIONS
 } from "@household/config";
-import { formatCurrency, sanitizeAmountInput } from "@household/ui";
+import {
+  classifyRecurringFailureReason,
+  formatCurrency,
+  sanitizeAmountInput,
+  type RecurringFailureKind
+} from "@household/ui";
 
 const recurringFailureFilterStorageKey = "web-recurring-failure-filters-v1";
 
@@ -36,9 +41,9 @@ export type RecurringExecutionLogItem = {
   recurringTransactionId: string;
   scheduledFor: string;
   executedAt: string;
+  status: "pending" | "success" | "failed";
   transactionId: string | null;
-  message?: string;
-  error?: string;
+  errorMessage?: string;
 };
 
 function formatExecutionDateTime(value: string) {
@@ -56,10 +61,16 @@ function normalizeExecutionFailureReason(value: unknown) {
 
 function getExecutionFailureReason(item: RecurringExecutionLogItem) {
   return (
-    normalizeExecutionFailureReason(item.message) ??
-    normalizeExecutionFailureReason(item.error)
+    normalizeExecutionFailureReason(item.errorMessage)
   );
 }
+
+const recurringFailureBadgeClassName: Record<RecurringFailureKind, string> = {
+  permission: "border-amber-200 bg-amber-50 text-amber-700",
+  network: "border-sky-200 bg-sky-50 text-sky-700",
+  input: "border-violet-200 bg-violet-50 text-violet-700",
+  other: "border-stone-200 bg-stone-100 text-stone-700"
+};
 
 function summarizeRecurringExecutionLogs(items: RecurringExecutionLogItem[]) {
   const sevenDaysAgo = dayjs().subtract(7, "day").valueOf();
@@ -73,7 +84,7 @@ function summarizeRecurringExecutionLogs(items: RecurringExecutionLogItem[]) {
 
   for (const item of items) {
     const executedAt = dayjs(item.executedAt);
-    const isSuccess = Boolean(item.transactionId);
+    const isSuccess = item.status === "success";
     if (isSuccess) {
       totalSuccessCount += 1;
     } else {
@@ -138,7 +149,7 @@ export function SummaryCards({
         { label: "이번 달 지출", value: summary.expense },
         { label: "이번 달 잔액", value: summary.balance }
       ].map((card) => (
-        <article key={card.label} className="rounded-[24px] bg-card p-6 shadow-sm">
+        <article key={card.label} className="rounded-[24px] border border-[var(--border)] bg-[var(--card-strong)] p-6 shadow-[var(--shadow-soft)]">
           <p className="text-sm text-stone-500">{card.label}</p>
           <p className="mt-3 text-3xl font-semibold">
             {loading ? "불러오는 중..." : formatCurrency(card.value)}
@@ -151,7 +162,7 @@ export function SummaryCards({
 
 export function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white px-4 py-4">
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] shadow-[var(--shadow-soft)] px-4 py-4">
       <p className="text-sm text-stone-500">{label}</p>
       <p className="mt-2 text-lg font-semibold">{value}</p>
     </div>
@@ -166,7 +177,7 @@ export function FormSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[24px] bg-card p-6 shadow-sm">
+    <section className="rounded-[24px] border border-[var(--border)] bg-[var(--card-strong)] p-6 shadow-[var(--shadow-soft)]">
       <h2 className="text-xl font-semibold">{title}</h2>
       <div className="mt-4">{children}</div>
     </section>
@@ -200,11 +211,11 @@ export function AccountFormPanel({
     <form className="flex flex-col gap-3" onSubmit={form.handleSubmit((values) => void onSubmit(values))}>
       <fieldset className="flex flex-col gap-3" disabled={disabled}>
         <div>
-          <input className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" placeholder="계정 이름" {...form.register("name")} />
+          <input className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" placeholder="계정 이름" {...form.register("name")} />
           <FieldError message={errors.name?.message} />
         </div>
         <div>
-          <select className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" {...form.register("type")}>
+          <select className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" {...form.register("type")}>
           {ACCOUNT_TYPE_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -214,10 +225,10 @@ export function AccountFormPanel({
           <FieldError message={errors.type?.message} />
         </div>
         <div>
-          <input className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" placeholder="현재 잔액" {...form.register("balanceInput")} value={form.watch("balanceInput")} onChange={(event) => form.setValue("balanceInput", sanitizeAmountInput(event.target.value))} />
+          <input className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" placeholder="현재 잔액" {...form.register("balanceInput")} value={form.watch("balanceInput")} onChange={(event) => form.setValue("balanceInput", sanitizeAmountInput(event.target.value))} />
           <FieldError message={errors.balanceInput?.message} />
         </div>
-        <button className="rounded-full bg-ink px-5 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled} type="submit">
+        <button className="rounded-full bg-[var(--point)] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,108,102,0.24)] transition hover:bg-[var(--point-strong)] disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled} type="submit">
           {"계정 저장"}
         </button>
       </fieldset>
@@ -240,11 +251,11 @@ export function CategoryFormPanel({
     <form className="flex flex-col gap-3" onSubmit={form.handleSubmit((values) => void onSubmit(values))}>
       <fieldset className="flex flex-col gap-3" disabled={disabled}>
         <div>
-          <input className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" placeholder="카테고리 이름" {...form.register("name")} />
+          <input className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" placeholder="카테고리 이름" {...form.register("name")} />
           <FieldError message={errors.name?.message} />
         </div>
         <div>
-          <select className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" {...form.register("kind")}>
+          <select className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" {...form.register("kind")}>
           {CATEGORY_KIND_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -254,14 +265,14 @@ export function CategoryFormPanel({
           <FieldError message={errors.kind?.message} />
         </div>
         <div>
-          <input className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" placeholder="#1c7c54" {...form.register("color")} />
+          <input className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" placeholder="#1c7c54" {...form.register("color")} />
           <FieldError message={errors.color?.message} />
         </div>
         <div>
-          <input className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" placeholder="아이콘 키(옵션)" {...form.register("icon")} />
+          <input className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" placeholder="아이콘 키(옵션)" {...form.register("icon")} />
           <FieldError message={errors.icon?.message} />
         </div>
-        <button className="rounded-full bg-ink px-5 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled} type="submit">
+        <button className="rounded-full bg-[var(--point)] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,108,102,0.24)] transition hover:bg-[var(--point-strong)] disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled} type="submit">
           {"카테고리 저장"}
         </button>
       </fieldset>
@@ -290,7 +301,7 @@ export function TransactionFormPanel({
     <form className="flex flex-col gap-3" onSubmit={form.handleSubmit((values) => void onSubmit(values))}>
       <fieldset className="flex flex-col gap-3" disabled={disabled}>
         <div>
-          <select className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" {...form.register("type")}>
+          <select className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" {...form.register("type")}>
           {TRANSACTION_TYPE_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -300,15 +311,15 @@ export function TransactionFormPanel({
           <FieldError message={errors.type?.message} />
         </div>
         <div>
-          <input className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" placeholder="금액" {...form.register("amountInput")} value={form.watch("amountInput")} onChange={(event) => form.setValue("amountInput", sanitizeAmountInput(event.target.value))} />
+          <input className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" placeholder="금액" {...form.register("amountInput")} value={form.watch("amountInput")} onChange={(event) => form.setValue("amountInput", sanitizeAmountInput(event.target.value))} />
           <FieldError message={errors.amountInput?.message} />
         </div>
         <div>
-          <input className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" type="date" {...form.register("occurredAt")} />
+          <input className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" type="date" {...form.register("occurredAt")} />
           <FieldError message={errors.occurredAt?.message} />
         </div>
         <div>
-          <select className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" {...form.register("accountId")}>
+          <select className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" {...form.register("accountId")}>
           <option value="">{"계정 선택"}</option>
           {accounts.map((item) => (
             <option key={item.id} value={item.id}>
@@ -320,7 +331,7 @@ export function TransactionFormPanel({
         </div>
         {transactionType === "transfer" ? (
           <div>
-            <select className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" {...form.register("transferAccountId")}>
+            <select className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" {...form.register("transferAccountId")}>
               <option value="">{"받는 계정 선택"}</option>
               {accounts.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -332,7 +343,7 @@ export function TransactionFormPanel({
           </div>
         ) : (
           <div>
-            <select className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" {...form.register("categoryId")}>
+            <select className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" {...form.register("categoryId")}>
               <option value="">{"카테고리 선택"}</option>
               {categories.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -344,10 +355,10 @@ export function TransactionFormPanel({
           </div>
         )}
         <div>
-          <input className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" placeholder="메모" {...form.register("description")} />
+          <input className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" placeholder="메모" {...form.register("description")} />
           <FieldError message={errors.description?.message} />
         </div>
-        <button className="rounded-full bg-ink px-5 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled} type="submit">
+        <button className="rounded-full bg-[var(--point)] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,108,102,0.24)] transition hover:bg-[var(--point-strong)] disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled} type="submit">
           {"거래 저장"}
         </button>
       </fieldset>
@@ -372,7 +383,7 @@ export function SimpleList({
 }) {
   if (!items.length) {
     return (
-      <p className="mt-4 rounded-2xl bg-stone-100 px-4 py-4 text-sm text-stone-600">
+      <p className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-4 text-sm text-[var(--muted-foreground)]">
         {emptyLabel}
       </p>
     );
@@ -381,7 +392,7 @@ export function SimpleList({
   return (
     <div className="mt-4 flex flex-col gap-3">
       {items.map((item) => (
-        <div key={item.id} className="flex items-center justify-between rounded-2xl border border-stone-200 bg-white px-4 py-3">
+        <div key={item.id} className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] shadow-[var(--shadow-soft)] px-4 py-3">
           <div>
             <p className="font-medium">{item.title}</p>
             <p className="mt-1 text-sm text-stone-500">{item.subtitle}</p>
@@ -409,18 +420,18 @@ export function SimpleList({
 
 export function StatsPanel({ ledger }: { ledger: LedgerSnapshot | null }) {
   return (
-    <section className="rounded-[24px] bg-card p-6 shadow-sm">
+    <section className="rounded-[24px] border border-[var(--border)] bg-[var(--card-strong)] p-6 shadow-[var(--shadow-soft)]">
       <h2 className="text-xl font-semibold">
         {"카테고리별 소비 비중"}
       </h2>
       {!ledger?.monthlyStats.categoryBreakdown.length ? (
-        <p className="mt-4 rounded-2xl bg-stone-100 px-4 py-4 text-sm text-stone-600">
+        <p className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-4 text-sm text-[var(--muted-foreground)]">
           {"통계를 표시할 지출 데이터가 없습니다."}
         </p>
       ) : null}
       <div className="mt-4 flex flex-col gap-3">
         {ledger?.monthlyStats.categoryBreakdown.map((item) => (
-          <div key={item.categoryId} className="rounded-2xl border border-stone-200 bg-white p-4">
+          <div key={item.categoryId} className="rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] shadow-[var(--shadow-soft)] p-4">
             <div className="flex items-center justify-between">
               <p className="font-medium">{item.categoryName}</p>
               <p className="text-sm text-stone-500">{item.percentage}%</p>
@@ -438,18 +449,18 @@ export function StatsPanel({ ledger }: { ledger: LedgerSnapshot | null }) {
 
 export function BudgetProgressPanel({ ledger }: { ledger: LedgerSnapshot | null }) {
   return (
-    <section className="rounded-[24px] bg-card p-6 shadow-sm">
+    <section className="rounded-[24px] border border-[var(--border)] bg-[var(--card-strong)] p-6 shadow-[var(--shadow-soft)]">
       <h2 className="text-xl font-semibold">
         {"예산 진행률"}
       </h2>
       {!ledger?.monthlyStats.budgetProgress.length ? (
-        <p className="mt-4 rounded-2xl bg-stone-100 px-4 py-4 text-sm text-stone-600">
+        <p className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-4 text-sm text-[var(--muted-foreground)]">
           {"설정된 예산이 없습니다."}
         </p>
       ) : null}
       <div className="mt-4 flex flex-col gap-3">
         {ledger?.monthlyStats.budgetProgress.map((item) => (
-          <div key={item.budgetId} className="rounded-2xl border border-stone-200 bg-white p-4">
+          <div key={item.budgetId} className="rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] shadow-[var(--shadow-soft)] p-4">
             <div className="flex items-center justify-between">
               <p className="font-medium">
                 {item.categoryName ?? "카테고리"}
@@ -503,7 +514,7 @@ export function MonthlyTrendPanel({
   const zeroLineY = chartHeight - ((0 - minBalance) / balanceSpan) * chartHeight;
 
   return (
-    <section className="rounded-[24px] bg-card p-6 shadow-sm">
+    <section className="rounded-[24px] border border-[var(--border)] bg-[var(--card-strong)] p-6 shadow-[var(--shadow-soft)]">
       <h2 className="text-xl font-semibold">
         {"최근 6개월 추이"}
       </h2>
@@ -512,13 +523,13 @@ export function MonthlyTrendPanel({
       </p>
 
       {loading ? (
-        <p className="mt-4 rounded-2xl bg-stone-100 px-4 py-4 text-sm text-stone-600">
+        <p className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-4 text-sm text-[var(--muted-foreground)]">
           {"차트를 불러오는 중입니다."}
         </p>
       ) : null}
 
       {!loading && !hasData ? (
-        <p className="mt-4 rounded-2xl bg-stone-100 px-4 py-4 text-sm text-stone-600">
+        <p className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-4 text-sm text-[var(--muted-foreground)]">
           {"최근 6개월에 차트로 만들 데이터가 없습니다."}
         </p>
       ) : null}
@@ -631,11 +642,11 @@ export function BudgetFormPanel({
     <form className="flex flex-col gap-3" onSubmit={form.handleSubmit((values) => void onSubmit(values))}>
       <fieldset className="flex flex-col gap-3" disabled={disabled}>
         <div>
-          <input className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" placeholder="YYYY-MM" {...form.register("month")} />
+          <input className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" placeholder="YYYY-MM" {...form.register("month")} />
           <FieldError message={errors.month?.message} />
         </div>
         <div>
-          <select className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" {...form.register("categoryId")}>
+          <select className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" {...form.register("categoryId")}>
             <option value="">{"카테고리 선택"}</option>
             {categories.filter((item) => item.kind === "expense").map((item) => (
               <option key={item.id} value={item.id}>
@@ -646,10 +657,10 @@ export function BudgetFormPanel({
           <FieldError message={errors.categoryId?.message} />
         </div>
         <div>
-          <input className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" placeholder="예산 금액" {...form.register("amountInput")} value={form.watch("amountInput")} onChange={(event) => form.setValue("amountInput", sanitizeAmountInput(event.target.value))} />
+          <input className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" placeholder="예산 금액" {...form.register("amountInput")} value={form.watch("amountInput")} onChange={(event) => form.setValue("amountInput", sanitizeAmountInput(event.target.value))} />
           <FieldError message={errors.amountInput?.message} />
         </div>
-        <button className="rounded-full bg-ink px-5 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled} type="submit">
+        <button className="rounded-full bg-[var(--point)] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,108,102,0.24)] transition hover:bg-[var(--point-strong)] disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled} type="submit">
           {"예산 저장"}
         </button>
       </fieldset>
@@ -677,7 +688,7 @@ export function RecurringFormPanel({
     <form className="flex flex-col gap-3" onSubmit={form.handleSubmit((values) => void onSubmit(values))}>
       <fieldset className="flex flex-col gap-3" disabled={disabled}>
         <div>
-          <select className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" {...form.register("type")}>
+          <select className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" {...form.register("type")}>
           {TRANSACTION_TYPE_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -687,11 +698,11 @@ export function RecurringFormPanel({
           <FieldError message={errors.type?.message} />
         </div>
         <div>
-          <input className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" placeholder="반복 설명" {...form.register("description")} />
+          <input className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" placeholder="반복 설명" {...form.register("description")} />
           <FieldError message={errors.description?.message} />
         </div>
         <div>
-          <select className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" {...form.register("accountId")}>
+          <select className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" {...form.register("accountId")}>
           <option value="">{"계정 선택"}</option>
           {accounts.map((item) => (
             <option key={item.id} value={item.id}>
@@ -703,7 +714,7 @@ export function RecurringFormPanel({
         </div>
         {recurringType === "transfer" ? (
           <div>
-            <select className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" {...form.register("transferAccountId")}>
+            <select className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" {...form.register("transferAccountId")}>
               <option value="">{"받는 계정 선택"}</option>
               {accounts.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -715,7 +726,7 @@ export function RecurringFormPanel({
           </div>
         ) : (
           <div>
-            <select className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" {...form.register("categoryId")}>
+            <select className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" {...form.register("categoryId")}>
               <option value="">{"카테고리 선택"}</option>
               {categories.filter((item) => item.kind === recurringType).map((item) => (
                 <option key={item.id} value={item.id}>
@@ -727,11 +738,11 @@ export function RecurringFormPanel({
           </div>
         )}
         <div>
-          <input className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" placeholder="반복 금액" {...form.register("amountInput")} value={form.watch("amountInput")} onChange={(event) => form.setValue("amountInput", sanitizeAmountInput(event.target.value))} />
+          <input className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" placeholder="반복 금액" {...form.register("amountInput")} value={form.watch("amountInput")} onChange={(event) => form.setValue("amountInput", sanitizeAmountInput(event.target.value))} />
           <FieldError message={errors.amountInput?.message} />
         </div>
         <div>
-          <select className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" {...form.register("frequency")}>
+          <select className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" {...form.register("frequency")}>
           {RECURRING_FREQUENCY_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -741,15 +752,15 @@ export function RecurringFormPanel({
           <FieldError message={errors.frequency?.message} />
         </div>
         <div>
-          <input className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" type="date" {...form.register("nextRunAt")} />
+          <input className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" type="date" {...form.register("nextRunAt")} />
           <FieldError message={errors.nextRunAt?.message} />
         </div>
-        <label className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm">
+        <label className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] shadow-[var(--shadow-soft)] px-4 py-3 text-sm">
           <input className="h-4 w-4 accent-ink" type="checkbox" {...form.register("isActive")} />
           <span>{"활성 여부"}</span>
         </label>
         <FieldError message={errors.isActive?.message} />
-        <button className="rounded-full bg-ink px-5 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled} type="submit">
+        <button className="rounded-full bg-[var(--point)] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,108,102,0.24)] transition hover:bg-[var(--point-strong)] disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled} type="submit">
           {"반복지출 저장"}
         </button>
       </fieldset>
@@ -768,13 +779,14 @@ export function RecurringExecutionPanel({
 }) {
   const hasItems = items.length > 0;
   const summary = summarizeRecurringExecutionLogs(items);
-  const failureLogItems = items.filter((item) => !item.transactionId);
+  const failureLogItems = items.filter((item) => item.status === "failed");
   const [failureReasonQuery, setFailureReasonQuery] = React.useState("");
   const [failurePeriodFilter, setFailurePeriodFilter] = React.useState<"7d" | "30d" | "all">("all");
   const [failureReasonStateFilter, setFailureReasonStateFilter] = React.useState<
     "all" | "with_reason" | "without_reason"
   >("all");
   const [isFilterHydrated, setIsFilterHydrated] = React.useState(false);
+  const [rerunGuideCopied, setRerunGuideCopied] = React.useState(false);
   const normalizedFailureReasonQuery = failureReasonQuery.trim().toLowerCase();
   const filteredFailureLogItems = React.useMemo(() => {
     const now = Date.now();
@@ -916,8 +928,20 @@ export function RecurringExecutionPanel({
     window.history.replaceState(null, "", nextUrl);
   }, [failurePeriodFilter, failureReasonQuery, failureReasonStateFilter, isFilterHydrated]);
 
+  React.useEffect(() => {
+    if (!rerunGuideCopied) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setRerunGuideCopied(false);
+    }, 1800);
+
+    return () => window.clearTimeout(timeout);
+  }, [rerunGuideCopied]);
+
   return (
-    <section className="rounded-[24px] bg-card p-6 shadow-sm">
+    <section className="rounded-[24px] border border-[var(--border)] bg-[var(--card-strong)] p-6 shadow-[var(--shadow-soft)]">
       <h2 className="text-xl font-semibold">{"반복배치 실행 로그"}</h2>
       <p className="mt-2 text-sm text-stone-500">
         {"최근 실행된 반복거래의 예약 시각, 실행 시각, 생성 결과를 확인합니다."}
@@ -949,7 +973,34 @@ export function RecurringExecutionPanel({
             <span className="font-medium text-stone-700">{"실패 사유 요약: "}</span>
             {summary.failureReasonSummary}
           </p>
-          <details className="mt-3 rounded-2xl border border-stone-200 bg-white">
+          <div className="mt-3 rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] shadow-[var(--shadow-soft)] px-4 py-3">
+            <p className="text-xs font-medium text-stone-600">{"배치 재실행"}</p>
+            <p className="mt-1 text-sm text-stone-700">
+              {"실패 원인을 정리한 뒤 아래 명령으로 dry-run을 다시 확인하세요."}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <code className="rounded-md bg-stone-100 px-2 py-1 text-xs">
+                {"pnpm ops:check-recurring-batch"}
+              </code>
+              <button
+                className="rounded-full border border-stone-300 px-3 py-1 text-xs"
+                onClick={() => {
+                  if (typeof window === "undefined") {
+                    return;
+                  }
+
+                  navigator.clipboard
+                    .writeText("pnpm ops:check-recurring-batch")
+                    .then(() => setRerunGuideCopied(true))
+                    .catch(() => setRerunGuideCopied(false));
+                }}
+                type="button"
+              >
+                {rerunGuideCopied ? "복사됨" : "명령 복사"}
+              </button>
+            </div>
+          </div>
+          <details className="mt-3 rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] shadow-[var(--shadow-soft)]">
             <summary className="cursor-pointer list-none rounded-2xl px-4 py-3 text-sm font-medium text-stone-700">
               {`실패 로그 상세 보기 (최근 ${Math.min(recentFailureLogItems.length, 5)}건)`}
             </summary>
@@ -960,7 +1011,7 @@ export function RecurringExecutionPanel({
                 <div className="flex flex-col gap-3">
                   <div>
                     <input
-                      className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm"
+                      className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]"
                       onChange={(event) => setFailureReasonQuery(event.target.value)}
                       placeholder="실패 사유 검색"
                       value={failureReasonQuery}
@@ -968,7 +1019,7 @@ export function RecurringExecutionPanel({
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <select
-                      className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm"
+                      className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]"
                       onChange={(event) =>
                         setFailurePeriodFilter(event.target.value as "7d" | "30d" | "all")
                       }
@@ -979,7 +1030,7 @@ export function RecurringExecutionPanel({
                       <option value="30d">{"기간: 최근 30일"}</option>
                     </select>
                     <select
-                      className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm"
+                      className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]"
                       onChange={(event) =>
                         setFailureReasonStateFilter(
                           event.target.value as "all" | "with_reason" | "without_reason"
@@ -1012,6 +1063,7 @@ export function RecurringExecutionPanel({
                   ) : null}
                   {recentFailureLogItems.map((item) => {
                     const reason = getExecutionFailureReason(item) ?? "사유 없음";
+                    const failureKind = classifyRecurringFailureReason(reason);
 
                     return (
                       <div
@@ -1023,13 +1075,18 @@ export function RecurringExecutionPanel({
                         </p>
                         <p className="mt-1 text-stone-600">
                           <span className="font-medium text-stone-700">{"사유: "}</span>
+                          <span
+                            className={`mr-2 inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${recurringFailureBadgeClassName[failureKind.kind]}`}
+                          >
+                            {failureKind.label}
+                          </span>
                           {reason}
                         </p>
                       </div>
                     );
                   })}
                   {filteredFailureLogItems.length > recentFailureLogItems.length ? (
-                    <details className="rounded-2xl border border-stone-200 bg-white">
+                    <details className="rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] shadow-[var(--shadow-soft)]">
                       <summary className="cursor-pointer list-none rounded-2xl px-4 py-3 text-sm font-medium text-stone-700">
                         {`전체 실패 로그 보기 (${filteredFailureLogItems.length}건)`}
                       </summary>
@@ -1037,6 +1094,7 @@ export function RecurringExecutionPanel({
                         <div className="flex flex-col gap-3">
                           {filteredFailureLogItems.slice(5).map((item) => {
                             const reason = getExecutionFailureReason(item) ?? "사유 없음";
+                            const failureKind = classifyRecurringFailureReason(reason);
 
                             return (
                               <div
@@ -1048,6 +1106,11 @@ export function RecurringExecutionPanel({
                                 </p>
                                 <p className="mt-1 text-stone-600">
                                   <span className="font-medium text-stone-700">{"사유: "}</span>
+                                  <span
+                                    className={`mr-2 inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${recurringFailureBadgeClassName[failureKind.kind]}`}
+                                  >
+                                    {failureKind.label}
+                                  </span>
                                   {reason}
                                 </p>
                               </div>
@@ -1065,7 +1128,7 @@ export function RecurringExecutionPanel({
       ) : null}
 
       {loading ? (
-        <p className="mt-4 rounded-2xl bg-stone-100 px-4 py-4 text-sm text-stone-600">
+        <p className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-4 text-sm text-[var(--muted-foreground)]">
           {"실행 로그를 불러오는 중입니다."}
         </p>
       ) : null}
@@ -1077,15 +1140,19 @@ export function RecurringExecutionPanel({
       ) : null}
 
       {!loading && !error && !hasItems ? (
-        <p className="mt-4 rounded-2xl bg-stone-100 px-4 py-4 text-sm text-stone-600">
+        <p className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-4 text-sm text-[var(--muted-foreground)]">
           {"아직 실행 로그가 없습니다. 예약 시각이 지난 반복거래가 실행되면 여기에 표시됩니다."}
         </p>
       ) : null}
 
       {!loading && !error && hasItems ? (
         <div className="mt-4 flex flex-col gap-3">
-          {items.map((item) => (
-            <article key={item.id} className="rounded-2xl border border-stone-200 bg-white p-4">
+          {items.map((item) => {
+            const failureReason = getExecutionFailureReason(item);
+            const failureKind = classifyRecurringFailureReason(failureReason);
+
+            return (
+              <article key={item.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card-strong)] shadow-[var(--shadow-soft)] p-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="font-medium">
@@ -1101,12 +1168,18 @@ export function RecurringExecutionPanel({
                 </div>
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-medium ${
-                    item.transactionId
+                    item.status === "success"
                       ? "bg-emerald-50 text-emerald-700"
-                      : "bg-stone-100 text-stone-600"
+                      : item.status === "failed"
+                        ? "bg-rose-50 text-rose-700"
+                        : "bg-stone-100 text-stone-600"
                   }`}
                 >
-                  {item.transactionId ? "생성 거래 있음" : "생성 거래 없음"}
+                  {item.status === "success"
+                    ? "성공"
+                    : item.status === "failed"
+                      ? "실패"
+                      : "대기"}
                 </span>
               </div>
 
@@ -1129,9 +1202,27 @@ export function RecurringExecutionPanel({
                     {item.transactionId ? "있음" : "없음"}
                   </dd>
                 </div>
+                <div className="rounded-2xl bg-stone-50 px-4 py-3 sm:col-span-3">
+                  <dt className="text-xs text-stone-500">{"실패 원인"}</dt>
+                  <dd className="mt-1 text-sm font-medium text-stone-800">
+                    {item.status === "failed" ? (
+                      <span className="inline-flex flex-wrap items-center gap-2">
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${recurringFailureBadgeClassName[failureKind.kind]}`}
+                        >
+                          {failureKind.label}
+                        </span>
+                        <span>{failureReason ?? "알 수 없는 오류"}</span>
+                      </span>
+                    ) : (
+                      "-"
+                    )}
+                  </dd>
+                </div>
               </dl>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       ) : null}
     </section>
@@ -1152,11 +1243,11 @@ export function SettingsFormPanel({
     <form className="flex flex-col gap-3" onSubmit={form.handleSubmit((values) => void onSubmit(values))}>
       <fieldset className="flex flex-col gap-3" disabled={disabled}>
         <div>
-          <input className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" placeholder="표시 이름" {...form.register("displayName")} />
+          <input className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" placeholder="표시 이름" {...form.register("displayName")} />
           <FieldError message={errors.displayName?.message} />
         </div>
         <div>
-          <select className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" {...form.register("defaultCurrency")}>
+          <select className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" {...form.register("defaultCurrency")}>
           {CURRENCY_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -1166,7 +1257,7 @@ export function SettingsFormPanel({
           <FieldError message={errors.defaultCurrency?.message} />
         </div>
         <div>
-          <select className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" {...form.register("weekStartsOn", { valueAsNumber: true })}>
+          <select className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" {...form.register("weekStartsOn", { valueAsNumber: true })}>
           {WEEK_START_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -1176,15 +1267,16 @@ export function SettingsFormPanel({
           <FieldError message={errors.weekStartsOn?.message} />
         </div>
         <div>
-          <input className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm" max={28} min={1} type="number" {...form.register("monthStartDay", { valueAsNumber: true })} />
+          <input className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[rgba(15,108,102,0.15)]" max={28} min={1} type="number" {...form.register("monthStartDay", { valueAsNumber: true })} />
           <FieldError message={errors.monthStartDay?.message} />
         </div>
-        <button className="rounded-full bg-ink px-5 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled} type="submit">
+        <button className="rounded-full bg-[var(--point)] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,108,102,0.24)] transition hover:bg-[var(--point-strong)] disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled} type="submit">
           {"설정 저장"}
         </button>
       </fieldset>
     </form>
   );
 }
+
 
 

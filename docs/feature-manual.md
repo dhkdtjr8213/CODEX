@@ -1,179 +1,158 @@
 # 기능 매뉴얼
+최종 업데이트: 2026-04-15
 
-최종 업데이트: 2026-04-14
+이 문서는 현재 저장소에서 동작하는 MVP 기능과 운영/검증 방법을 한 곳에 정리한 안내서입니다.
 
-이 문서는 현재 저장소에서 동작하는 MVP 기능과 운영/검증 방법을 한 곳에 모은 안내서입니다.  
-앱과 웹은 같은 Supabase 인증/DB를 공유하며, 초기 버전은 오픈뱅킹 없이 수동 입력 중심으로 운영합니다.
-
-## 1. 현재 구현된 기능
+## 1. 현재 구현 범위
 
 ### 공통 도메인
-- 사용자(`user`) / 프로필(`profile`)
-- 계정(`account`)
-- 카테고리(`category`)
-- 거래(`transaction`)
-- 예산(`budget`)
-- 반복 거래(`recurring_transaction`)
+- 사용자/프로필 (`user`, `profile`)
+- 계정 (`account`)
+- 카테고리 (`category`)
+- 거래 (`transaction`)
+- 예산 (`budget`)
+- 반복거래 (`recurring_transaction`)
 
 ### 거래 타입
-- 수입(`income`)
-- 지출(`expense`)
-- 이체(`transfer`)
+- 수입 (`income`)
+- 지출 (`expense`)
+- 이체 (`transfer`)
 
-### 공통 동작
-- 계정/카테고리/거래/예산/반복 거래의 생성, 수정, 조회 흐름
-- 삭제는 가능한 범위에서 soft delete 또는 복구 가능 구조를 우선 고려
-- 한국 사용자 기준 금액/날짜/통화 포맷 사용
-- 같은 계정으로 모바일과 웹에서 동일 데이터 조회
+### 공통 원칙
+- 모바일/웹은 같은 Supabase 인증과 DB를 공유합니다.
+- 삭제는 hard delete보다 soft delete 흐름을 우선 적용합니다.
+- 금액/날짜/통화 포맷은 한국 사용자 기준을 기본으로 둡니다.
 
-### 웹에서 제공하는 기능
-- 좌측 워크스페이스 메뉴(월별 달력/대시보드/거래 검토/관리/설정)
-- 월별 달력 기반 입출금/이체 조회
-- 달력 키보드 이동(방향키)과 오늘/주말 강조
-- 거래 검색
-- 거래 유형, 계정, 카테고리, 기간 필터
-- 거래 정렬(날짜/금액/유형, 오름/내림)
-- 테이블 헤더 클릭 정렬
-- 거래 보기 모드 전환(카드/테이블)
-- 테이블 페이지 크기 선택(20/50/100)
-- 필터 결과 CSV/XLSX 내보내기
-- 필터 링크 복사
-- 관리 화면 하위 탭(빠른 입력/계정/카테고리/예산/반복거래/실행로그)
-- 테이블 컬럼 표시 토글(계정/카테고리, 메모)
-- 테이블 고정 헤더 + 페이지네이션
-- 거래 테이블 선택 행 일괄 작업(삭제/CSV/XLSX)
-- 저장/삭제 결과 토스트 알림
-- 달력 날짜 셀 합계 툴팁(수입/지출/이체)
-- 달력 우측 상세 패널 검색(메모/카테고리/계정)
-- 사용자 설정 저장
-  - 표시 이름
-  - 기본 통화
-  - 주 시작 요일
-  - 월 시작일
-- 대시보드 통계
-  - 이번 달 수입/지출/잔액
-  - 카테고리 소비 비중
-  - 예산 진행률
-  - 최근 6개월 추이
-  - 위젯 순서 재배치(로컬 저장)
-  - 위젯 접기/펼치기 + 위젯 단위 새로고침
+## 2. 웹 기능
 
-### 모바일에서 제공하는 기능
-- 빠른 거래 입력
-- 수입/지출/이체 빠른 전환
-- 당일 기록 중심의 입력 흐름
-- 홈에서 이번 달 수지, 최근 내역, 빠른 입력 진입점 확인
+### 워크스페이스 IA
+- 좌측 메인 메뉴: 월별 달력, 대시보드, 거래 검토, 관리, 설정
+- URL 상태 동기화: 새로고침 후에도 현재 탭/필터/관리 섹션 유지
 
-## 2. 모바일 사용법
+### 월별 달력
+- 월 단위 그리드로 날짜별 수입/지출/이체 확인
+- 오늘/주말 강조, 키보드 이동(화살표)
+- 카테고리 색상 점 표시 및 지출 카테고리 강조 범례
+- 우측 상세 패널에서 해당 날짜 거래 수정/삭제
+- 선택 날짜 기준 빠른 입력 동선 제공
 
-1. 앱에서 Supabase 계정으로 로그인한다.
-2. 홈에서 이번 달 수지와 최근 내역을 확인한다.
-3. 빠른 입력 버튼으로 수입, 지출, 이체 중 하나를 선택한다.
-4. 금액, 날짜, 계정, 카테고리를 입력한다.
-5. 저장 후 목록이나 홈에서 반영 여부를 확인한다.
+### 거래 검토
+- 검색/필터: 기간, 유형, 계정, 카테고리, 정렬
+- 카드/테이블 보기 전환
+- 컬럼 표시 토글, 페이지 크기 조절, 페이지 이동
+- 결과 내보내기: CSV/XLSX
+- 선택 행 일괄 작업
+  - 선택 삭제
+  - 선택 카테고리 일괄 변경
+- 저장 프리셋: 월급일, 고정비, 식비
 
-### 모바일 입력 팁
-- 금액은 자주 쓰는 값이 아니면 숫자 키패드로 직접 입력한다.
-- 날짜는 기본값을 오늘로 두고 필요할 때만 변경한다.
-- 이체는 출금 계정과 입금 계정을 분명히 구분해서 입력한다.
+### 관리
+- 좌측 서브메뉴 기반 섹션 분리
+  - 빠른 입력
+  - 계정
+  - 카테고리
+  - 예산
+  - 반복거래
+  - 실행로그
 
-## 3. 웹 사용법
+### 반복배치 실행로그
+- 최근 7일 성공/실패 요약
+- 누적 성공/실패 요약
+- 실패 로그 필터(검색/기간/사유상태)
+- 실패 사유 상세 확인
+- 재실행 명령 가이드 및 복사 버튼
 
-1. 같은 Supabase 계정으로 웹에 로그인한다.
-2. 좌측 워크스페이스 메뉴에서 `월별 달력`을 열어 날짜별 입출금/이체를 확인한다.
-3. `대시보드`에서 이번 달 수입/지출/잔액을 확인한다.
-4. `거래 검토` 화면에서 기간, 유형, 계정, 카테고리 조건으로 검색한다.
-5. 필요하면 필터 결과를 CSV 또는 XLSX로 내보낸다.
-6. `설정` 화면에서 표시 이름, 기본 통화, 주 시작 요일, 월 시작일을 조정한다.
-7. `관리` 화면에서 예산과 반복 거래 등록/수정/실행 상태를 점검한다.
+### 설정
+- 표시 이름
+- 기본 통화
+- 주 시작 요일
+- 월 시작일
 
-## 4. 반복 거래 배치
+## 3. 모바일 기능
+- 홈: 이번 달 요약/최근 거래/핵심 관리 진입
+- 입력: 수입/지출/이체 빠른 기록
+- 목록: 최근 거래 확인
+- 관리: 계정/카테고리/예산/반복거래 기본 관리
 
-반복 거래는 UI 등록/수정과 별도로 자동 실행 배치로 처리합니다.
+## 4. 반복배치 운영
 
-### 운영 흐름
-1. 반복 거래 마이그레이션을 적용한다.
-2. Edge Function `run-recurring-batch`를 배포한다.
-3. `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`를 설정한다.
-4. 스케줄러 또는 수동 호출로 배치를 실행한다.
-5. 실행 결과를 `transactions`와 실행 로그에서 확인한다.
+### 마이그레이션
+- `supabase/migrations/0001_mvp_auth_and_ledger.sql`
+- `supabase/migrations/0002_recurring_execution_batch.sql`
+- `supabase/migrations/0003_recurring_execution_failure_details.sql`
 
-### 검증 명령
-- `pnpm ops:check-recurring-batch`
+### 점검 명령
+- dry-run:
+  - `pnpm ops:check-recurring-batch`
+- execute:
+  - `pnpm ops:check-recurring-batch --execute`
 
 ### 관련 문서
 - [recurring-batch-scheduler.md](./recurring-batch-scheduler.md)
 - [deployment-checklist.md](./deployment-checklist.md)
 
 ## 5. 운영 명령
-
 - `pnpm ops:check-env`
+- `pnpm ops:check-harness-runner`
 - `pnpm smoke`
 - `pnpm smoke:with-env`
 - `pnpm ops:preflight`
 - `pnpm ops:preflight:local`
-- `pnpm ops:check-recurring-batch`
-
-### 언제 쓰는가
-- `ops:check-env`
-  - 웹/모바일/Supabase 필수 환경변수 누락 여부를 빠르게 확인할 때
-- `smoke`
-  - 기본 연결과 핵심 흐름을 짧게 확인할 때
-- `smoke:with-env`
-  - 실제 운영용 환경변수까지 포함해 확인할 때
-- `ops:preflight`
-  - 배포 직전 전체 사전 점검이 필요할 때
-- `ops:preflight:local`
-  - 로컬에서 일부 운영 변수 없이 사전 점검을 돌릴 때
-- `ops:check-recurring-batch`
-  - 반복 거래 자동 실행 dry-run을 확인할 때
+- `pnpm ops:ready`
+- `pnpm ops:ready:full`
 
 ## 6. 수동 검증 체크리스트
+1. 웹/모바일 동일 계정 로그인 확인
+2. 모바일 입력 거래의 웹 반영 확인
+3. 웹 수정/삭제 거래의 모바일 반영 확인
+4. 거래 검토 필터/정렬/내보내기 확인
+5. 달력 상세 패널의 수정/삭제/빠른입력 동선 확인
+6. 반복배치 로그의 실패 원인 표시 확인
 
-### 로그인/동기화
-1. 웹과 모바일이 같은 계정으로 로그인되는지 확인한다.
-2. 모바일에서 입력한 거래가 웹에 즉시 보이는지 확인한다.
-3. 웹에서 수정한 거래가 모바일에 반영되는지 확인한다.
+## 7. 릴리즈 준비
+- CI 필수 검사: `Typecheck`, `Lint`, `Smoke`
+- 브랜치 보호 규칙: [github-branch-protection.md](./github-branch-protection.md)
 
-### 거래 흐름
-1. 모바일에서 수입 1건을 입력한다.
-2. 모바일에서 지출 1건을 입력한다.
-3. 모바일에서 이체 1건을 입력한다.
-4. 웹에서 기간/유형/계정/카테고리 필터가 동작하는지 확인한다.
-5. 거래 수정과 soft delete 동작을 점검한다.
+## 8. 제한사항
+- MVP 단계에서는 오픈뱅킹 자동 연동 미포함
+- 운영 env 미설정 시 `smoke:with-env`와 preflight에서 경고/실패 가능
 
-### 통계/관리
-1. 대시보드의 이번 달 수지와 최근 내역이 노출되는지 확인한다.
-2. 예산 진행률과 카테고리 비중이 표시되는지 확인한다.
-3. 카테고리와 반복 거래 편집 흐름이 정상인지 확인한다.
-4. 필터 결과 CSV/XLSX 내보내기가 동작하는지 확인한다.
+## 9. 다음 TODO
+- 반복배치 실환경 execute 검증
+- main 브랜치 보호 규칙 실제 적용
+- 관리 화면 세부 UX 폴리싱(정보 밀도/반응형)
 
-### 반복 거래
-1. 실행 시점이 도래한 반복 거래를 하나 준비한다.
-2. `pnpm ops:check-recurring-batch`를 실행한다.
-3. dry-run 결과가 기대한 건수와 맞는지 확인한다.
-4. 실제 실행 후 `transactions`와 실행 로그를 확인한다.
+## 10. 멀티 에이전트 작업 체계
+- 규약 문서: `AGENTS.md`
+- 역할 스킬: `.agents/skills/*/SKILL.md`
+  - 핵심 분리: `types`, `frontend-web`, `frontend-mobile`
+- 하네스: `harness/orchestrator.py`
+  - 실행 순서:
+    1. chief kickoff
+    2. deputy breakdown
+    3. planner spec
+    4. types lockdown
+    5. backend + designer (병렬)
+    6. frontend-web + frontend-mobile (병렬)
+    7. tester/reviewer/security
+    8. chief final
+- 모델 설정: `.codex/config.toml` (`gpt-5.3-codex`)
+- 주의:
+  - `OPENAI_API_KEY`가 없으면 `codex_runner`는 fallback 출력으로 동작합니다.
+  - 실호출 검증 전 `pnpm ops:check-harness-runner`로 러너 연결 상태를 먼저 점검합니다.
+  - 실행 산출물은 `work/tasks/*`에 생성됩니다.
 
-## 7. 제한사항
-
-- 초기 MVP에서는 오픈뱅킹 자동 연동을 포함하지 않는다.
-- 운영용 환경변수가 비어 있으면 `smoke:with-env`와 `ops:preflight`가 실패할 수 있다.
-- 모바일과 웹은 같은 도메인 모델을 공유하지만, 화면 구성과 사용 맥락은 다르게 설계한다.
-- 반복 거래 자동 실행은 배치와 시크릿 설정이 맞아야 정상 동작한다.
-- 일부 기능은 아직 조회 중심으로만 완성되어 있을 수 있으므로, 수정/실행 흐름은 수동 검증이 필요하다.
-
-## 8. 다음 TODO
-
-- 월별 통계와 카테고리 관리 화면의 데이터 연결 보강
-- 예산 관리 UI와 서버 정합성 검증 강화
-- 반복 거래 자동 실행 배치의 운영 안정성 점검
-- 모바일 입력 UX 개선
-- 웹 관리 화면의 정렬/필터 확장 검토
-
-## 9. 참고 문서
-
-- [supabase-auth-sync.md](./supabase-auth-sync.md)
-- [runtime-env-setup.md](./runtime-env-setup.md)
-- [deployment-checklist.md](./deployment-checklist.md)
-- [web-management.md](./web-management.md)
-- [recurring-batch-scheduler.md](./recurring-batch-scheduler.md)
+### 러너 Provider 전환
+- 기본값: `AGENT_PROVIDER=openai_responses`
+- Gemma 로컬/호환 서버 사용 시:
+  - `AGENT_PROVIDER=openai_compatible_chat`
+  - `AGENT_API_BASE=http://127.0.0.1:11434` (예: Ollama OpenAI 호환 엔드포인트)
+  - `AGENT_MODEL=<gemma 모델명>`
+  - 키가 필요 없는 서버면 `AGENT_API_KEY` 생략 가능
+- Gemini API 사용 시:
+  - `AGENT_PROVIDER=gemini_generate_content`
+  - `AGENT_MODEL=<gemini/gemma 모델명>`
+  - `GEMINI_API_KEY` 또는 `GOOGLE_API_KEY` 설정 필요
+- 점검:
+  - `pnpm ops:check-harness-runner`
+  - 쿼터/네트워크 이슈로 fallback을 허용하고 싶으면 `HARNESS_ALLOW_FALLBACK=1`

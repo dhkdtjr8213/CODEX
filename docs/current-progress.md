@@ -1,73 +1,128 @@
 # 현재 진행 상황
 
-기준일: 2026-04-13
+기준일: 2026-04-20
+
+## 최신 업데이트 (2026-04-20)
+- Web 디자인 1차 개선 반영
+  - 대시보드 상단 `Core KPI` 블록 추가(핵심 숫자 4종 + 빠른 액션)
+  - 빠른 입력 `최근 템플릿` 카드 밀도 개선(3열, 사용횟수 배지)
+  - 거래 입력 시 기본 카테고리 자동 채움 로직 추가
+- Web 디자인 2차 보정 반영
+  - KPI 카드에 위험 톤(잔액 음수/예산 위험) 강조 색상 반영
+  - KPI 4번째 지표를 `예산 위험/집중도`로 교체
+  - KPI 색상 기준을 `packages/ui` 공통 토큰(`kpiToneTokens`)으로 연결
+- Mobile 디자인/기능 1차 개선 반영
+  - 홈에 `스타터 팩` 카드 추가(누락 계정/카테고리 수 안내 + 원탭 적용)
+  - 홈에 `월간 인사이트 Top 3` 카드 추가(지출 상위 카테고리)
+  - 스타터 팩 적용 중 중복 클릭 방지(`ActionButton disabled`) 반영
+- Mobile 기능 2차 반영
+  - 입력 화면에 `최근 사용 템플릿` 원탭 불러오기 추가
+  - 템플릿 카드에 거래 유형/계정/카테고리 정보 보강
+  - 길게 눌러 템플릿 고정(pin) + 고정 템플릿 우선 정렬 반영
+- 하네스 안정화 보강
+  - 역할별 실행 제한시간 도입: `HARNESS_ROLE_TIMEOUT_SEC`(기본 90초)
+  - 전체 실행 제한시간 도입: `HARNESS_FULL_TIMEOUT_MS`(기본 900000ms)
+  - timeout 발생 시 원인 메시지 명시
+  - `연속 실패 시 조기 종료` 도입: `HARNESS_MAX_CONSECUTIVE_FAILURES`(기본 3)
+  - Windows에서 timeout 시 프로세스 트리 강제 종료(`taskkill /T`)
+- `pnpm ops:pr-rehearsal`: PASS
+  - `typecheck`, `lint`, `smoke` 통과
+  - 리포트 갱신: `docs/manual-kit/pr-rehearsal-last-report.md`
+- `pnpm ops:preflight`: PASS (실운영 연결 재검증 완료)
+  - 리포트 갱신: `docs/manual-kit/preflight-last-report.md`
+  - 체크리스트 자동 갱신: `docs/deployment-checklist.md`
+- 장시간 하네스 검증(`HARNESS_QUICK_MODE=0`): 진행 시간 이슈 지속
+  - 10분/20분 실행 모두 타임아웃으로 완주 실패
+  - `work/tasks/LEDGER-20260420-094555`, `work/tasks/LEDGER-20260420-100433`에서 중간 산출물 확인
+  - 튜닝 재검증(`ROLE_TIMEOUT=45`, `FULL_TIMEOUT=720000`)도 전체 타임아웃
+  - 단, 역할별 timeout 기록 확인(`chief/deputy/planner/types` fail-fast)
+    - `work/tasks/LEDGER-20260420-130704/state.json`
+  - 개선 재검증(`ROLE_TIMEOUT=30`, `MAX_CONSECUTIVE_FAILURES=1`) 결과
+    - `state=failed`로 조기 종료 확인
+    - reason: `Stopped early due to consecutive role failures` (last_role: chief)
+  - 프로세스 트리 강제 종료 반영 후 재검증에서도 동일하게 조기 종료 확인
+    - `LEDGER-20260420-142436`: state failed / reason 정상 출력 / 잔여 프로세스 없음
+- PR 게이트 상태
+  - PR #1은 여전히 `draft/open`, 리뷰 승인 없음
+  - Ready 전환 API 재시도 실패: GitHub 앱 토큰 만료(`token_expired`)
+- 레퍼런스 기반 기획 산출물 추가
+  - `docs/reference-based-feature-screen-blueprint-2026-04-20.md`
 
 ## 완료
-- Supabase Auth 기반으로 앱/웹이 같은 계정을 공유하는 방향을 확정함
-- 거래 타입 `income`, `expense`, `transfer` 기준을 정리함
-- 계정, 카테고리, 거래, 예산, 반복 거래 도메인 뼈대를 반영함
-- `ops:check-env`, `smoke`, `smoke:with-env`, `ops:preflight` 운영 명령을 문서와 스크립트에 연결함
-- 반복 거래 자동 실행 배치 검증용 `pnpm ops:check-recurring-batch`를 추가함
-- 웹 관리 기능 범위와 거래 검색/내보내기 기준을 문서화함
-- 모바일 홈에 반복거래 실행 로그 섹션을 추가하고, 최근 로그를 더 컴팩트한 형태로 개선함
-- 웹 반복배치 실행 로그 패널에 최근 7일 성공/실패/마지막 실행시각 요약을 추가함
-- 웹 반복배치 실행 로그 패널에 최근 7일 실패 사유 요약(상위 사유 집계)을 추가함
-- 모바일 반복거래 실행 로그 섹션에 최근 7일 성공/실패 건수 요약을 추가함
-- 웹 반복배치 실행 로그 패널에 총 누적 성공/실패 요약과 실패 로그 상세 펼침 UI를 추가함
-- 모바일 반복거래 실행 로그 섹션에 총 누적 성공/실패 건수 요약을 추가함
-- 웹 실패 로그 상세를 최근 5건 우선 노출하고 전체 펼침으로 확장할 수 있게 개선함
-- 모바일 실행 요약 줄을 2줄 구조로 정리해 작은 화면 줄바꿈 안정성을 개선함
-- 웹 실패 로그 상세에 사유 검색 필터를 추가함
-- 모바일 반복거래 로그 카드 탭 시 상세 모달(상태/사유)을 확인할 수 있게 개선함
-- 웹 실패 로그 상세에 기간/사유상태 필터를 추가해 문제 로그 탐색성을 개선함
-- 모바일 실행 상세 모달에 사유 공유 버튼을 추가함
-- 웹 실패 로그 필터 상태를 로컬에 저장해 재방문 시 유지되도록 개선함
-- 웹 실패 로그 필터를 URL 파라미터와 동기화해 공유/새로고침 복원을 지원함
-- 모바일 상세 공유 메시지에 로그 ID/예약시각/실행시각을 포함하도록 개선함
-- 기능 매뉴얼(`docs/feature-manual.md`)을 UTF-8 한국어 기준으로 재정리함
+- 웹 IA 및 달력/거래검토 UX 개선
+  - 좌측 워크스페이스/관리 서브메뉴 구조 정리
+  - URL 상태 동기화(`view`, `mtab`, 필터 파라미터)
+  - 월 요약 카드/범례/선택일 빠른 입력 동선
+  - 저장 프리셋, 선택 거래 일괄 카테고리 변경
+- 반복배치 운영 개선
+  - 실행 로그 요약/필터/재실행 가이드 개선
+  - `ops:preflight` 자동 리포트 갱신
+  - 실패 원인 추적 마이그레이션 추가
+    - `0003_recurring_execution_failure_details.sql`
+    - `status`, `error_message` 컬럼 및 예외 처리 반영
+- 릴리즈 준비
+  - CI 워크플로 추가(`Typecheck`, `Lint`, `Smoke`)
+  - 브랜치 보호 규칙 가이드 문서 추가
+- 멀티 에이전트 스택 특화 골격 추가
+  - `AGENTS.md`를 역할/스코프/게이트 규약으로 교체
+  - `.codex/config.toml` 모델을 `gpt-5.3-codex`로 고정
+  - `.agents/skills/*` 11개 역할 스킬 작성
+    - `types`, `frontend-web`, `frontend-mobile` 분리
+  - `harness/orchestrator.py`에 `types_lockdown` 단계 반영
+  - 병렬 단계 분리
+    - `backend + designer`
+    - `frontend-web + frontend-mobile`
+  - Supabase 특화 보안 체크리스트를 `security` 스킬에 반영
 
 ## 진행 중
-- 운영 환경변수 정리와 배포 전 검증 기준 고정
-- 반복 거래 배치의 실제 실행 경로와 dry-run 정합성 확인
-- 모바일 빠른 입력 UX와 웹 관리 화면의 데이터 연결 보강
-- 모바일 관리 화면에 프로필 설정(표시 이름/주 시작일/월 시작일) 저장 흐름 연결
-- 예산/카테고리/거래 목록의 세부 흐름 점검
+- `harness/codex_runner.py` 실호출(OpenAI API 키 설정) 검증
 
-## 오늘 할 일
-1. `pnpm ops:check-env`로 필수 환경변수 누락 여부를 재확인한다.
-2. `pnpm smoke`와 `pnpm smoke:with-env` 실행 조건을 정리한다.
-3. `pnpm ops:check-recurring-batch`로 반복 거래 dry-run 결과를 확인한다.
-4. Supabase Auth redirect URL과 운영 도메인 설정을 다시 점검한다.
-5. 모바일/웹에서 같은 계정 동기화가 유지되는지 확인한다.
+## 오늘 확인한 검증 결과
+- `pnpm typecheck`: 통과
+- `pnpm lint`: 통과
+- `npm run smoke`: 통과
+- `pnpm ops:check-env`: 통과 (7/7)
+- `pnpm ops:check-recurring-batch`: 통과 (dry-run)
+- `pnpm ops:check-recurring-batch --execute`: 통과
+- `pnpm ops:ready:full`: 통과
+- `pnpm ops:preflight`: 통과
+- 멀티 에이전트 정적 검증: 완료
+  - 역할 파일/하네스 파일 생성 확인
+  - `types_lockdown` 및 frontend 분리 단계 확인
+- 멀티 에이전트 실행 검증: 완료
+  - Python 런타임 복구 후 `harness/orchestrator.py --mock` 통과
+  - `AGENT_RUNNER_CMD` + `harness/codex_runner.py` 스텁 연동 통과
+- 브랜치 보호 자동화 스크립트 검증: 완료
+  - `pnpm ops:github:protect-main:dry` 통과
+  - `pnpm ops:github:protect-main` 적용 성공
+  - `main` 브랜치 메타데이터 확인: `protected=true`
+- `codex_runner` 업그레이드 검증: 완료
+  - OpenAI Responses API 호출 경로 추가
+  - `OPENAI_API_KEY` 미설정 fallback 동작 확인
+- `pnpm ops:check-harness-runner`: 통과
+  - task id: `LEDGER-20260415-124555`
+  - 현재는 fallback mode 검증(no key)
+- `OPENAI_API_KEY` 실호출 점검: 실패
+  - task id: `LEDGER-20260415-125347`
+  - OpenAI API `429` (`insufficient_quota`)
+- 멀티 provider 전환 지원: 완료
+  - `harness/codex_runner.py`에서 `openai_responses`, `openai_compatible_chat`, `gemini_generate_content` 지원
+  - `HARNESS_ALLOW_FALLBACK=1` 모드 점검 통과 (`LEDGER-20260415-125744`)
+- Gemma4 E4B 실연결: 완료
+  - Ollama 설치 + `gemma4:e4b` 모델 pull 완료
+  - `pnpm ops:check-harness-runner` quick mode 통과 (`fallback_output: no`)
+- PR 워크플로 리허설: 완료
+  - `pnpm ops:pr-rehearsal` 통과
+  - 리포트: `docs/manual-kit/pr-rehearsal-last-report.md`
 
-## 검증 순서
-1. Supabase 마이그레이션을 적용한다.
-2. 웹과 모바일이 같은 Supabase 프로젝트를 바라보는지 확인한다.
-3. `pnpm ops:check-env`를 실행한다.
-4. `pnpm smoke`로 기본 연결을 확인한다.
-5. 필요하면 `pnpm smoke:with-env`로 운영 변수 포함 검증을 수행한다.
-6. 웹과 모바일에서 같은 계정으로 로그인한다.
-7. 모바일에서 수입/지출/이체를 각각 1건씩 입력한다.
-8. 웹에서 동일 데이터가 보이는지 확인한다.
-9. 예산, 카테고리, 반복 거래 수정 흐름을 점검한다.
-10. `pnpm ops:check-recurring-batch`로 배치 dry-run을 확인한다.
+## 다음 작업 순서
+1. Draft PR 리뷰 반영 및 merge 준비
+   - PR: `https://github.com/dhkdtjr8213/CODEX/pull/1`
+2. 필요 시 `HARNESS_QUICK_MODE=0`로 전체 오케스트레이터 장시간 검증
 
-## 차단 이슈
-- 운영 env 미설정으로 `pnpm smoke:with-env`와 `pnpm ops:preflight`가 실패할 수 있음
-- 누락 가능 변수
-  - `NEXT_PUBLIC_SUPABASE_URL`
-  - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` 또는 `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-  - `EXPO_PUBLIC_SUPABASE_URL`
-  - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` 또는 `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-  - `SUPABASE_URL`
-  - `SUPABASE_SERVICE_ROLE_KEY`
-  - `CRON_SECRET`
-- 세부 가이드: [runtime-env-setup.md](./runtime-env-setup.md)
-
-## 메모
-- 반복 거래 자동 실행은 오픈뱅킹 없이도 MVP 범위에서 운영 가능하게 유지한다.
-- 앱과 웹은 같은 인증, 같은 DB, 같은 도메인 모델을 공유한다.
-- 새 기능은 화면보다 먼저 데이터 흐름과 운영 검증 경로를 맞춘다.
-- 진행률 자동 산정은 `pnpm ops:progress`로 확인한다.
-- 운영 준비 점검은 `pnpm ops:ready`(로컬), `pnpm ops:ready:full`(env/배치 포함)로 확인한다.
-- 현재 기능 매뉴얼: [feature-manual.md](./feature-manual.md)
+## 관련 문서
+- [feature-manual.md](./feature-manual.md)
+- [deployment-checklist.md](./deployment-checklist.md)
+- [recurring-batch-scheduler.md](./recurring-batch-scheduler.md)
+- [github-branch-protection.md](./github-branch-protection.md)
+- [manual-kit/preflight-last-report.md](./manual-kit/preflight-last-report.md)
